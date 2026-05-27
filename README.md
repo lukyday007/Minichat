@@ -1,5 +1,7 @@
 # 🚀 MiniChat - 대규모 트래픽 처리를 위한 실시간 채팅 서버
 
+> 📌 English version is available below. Scroll down to view the English README.
+
 > **대규모 동시 접속 환경을 가정하여 데이터 정합성과 시스템 안정성 확보에 주력한 백엔드 서버**
 > <br>
 > Master-Replica DB 구조와 Redis/Kafka 분산 처리 아키텍처를 도입하여, 실시간성과 대용량 트래픽 처리에 최적화된 서비스를 구현했습니다.
@@ -61,3 +63,51 @@
 | **쿼리 튜닝** | 조회 쿼리에 **복합 인덱스** 적용 및 페이징 처리를 통해 쿼리 실행 계획 최적화 |
 | **캐싱 전략 고도화** | 빈번한 쓰기 작업에 대해 **Redis Write-Back** 전략을 도입, DB 부하 감소 및 응답 속도 개선 |
 | **네트워크 비용** | JSON 기반 통신 대비 **gRPC** 도입으로 데이터 직렬화 크기를 줄여 릴레이 성능 최적화 |
+
+
+--- 
+# 🚀 MiniChat - Real-Time Chat Server for Large-Scale Traffic
+
+> **A backend server designed for large-scale concurrent environments with a strong focus on data consistency and system stability**
+> <br>
+> Built with a Master-Replica database architecture and distributed processing using Redis and Kafka to optimize real-time communication and high-throughput traffic handling.
+
+
+
+## 💡 Key Features
+
+### 1. DB Load Distribution & Transaction Optimization
+* **Master-Replica Architecture:** Separated write operations (Master) and read operations (Replica) using `AbstractRoutingDataSource` to effectively distribute database load.
+* **JPA Optimization:** Applied composite indexes and pagination to optimize API response times for large-scale data retrieval.
+
+### 2. Concurrency Control
+* **Redis Lua Script:** Implemented a high-performance rate limiter using Lua Scripts to guarantee atomic operations.
+* **Optimistic Locking:** Designed conditional update logic to maintain data consistency under concurrent access situations.
+
+### 3. High-Performance Real-Time Communication
+* **WebSocket & gRPC:** Used WebSocket for client communication and Protobuf-based gRPC for server-to-server message relay to minimize network overhead and reduce latency.
+* **Distributed Session Management:** Leveraged Redis to maintain seamless chat sessions across multiple server instances.
+
+### 4. Asynchronous Event Processing (Event-Driven)
+* **Kafka Integration:** Decoupled chat delivery and chat room update logic through Kafka-based event processing to improve scalability and reduce service coupling.
+
+<br>
+
+## 🚧 Technical Challenges & Improvements
+
+### **Limitations of a Single Redis Server**
+* **Problem:** Encountered scalability limitations as traffic increased while operating on a single Redis instance.
+* **Solution Approach:** Introduced Redis Cluster for distributed load handling.
+* **Challenge:** Lua Script operations across multiple nodes became impossible due to Redis Cluster sharding (`Cross-slot error`).
+* **Resolution:** Used **Redis Hashtag** (`{...}`) to force related business data into the same hash slot and node, ensuring atomic operations.
+
+<br>
+
+## 📈 Performance Optimizations & Lessons Learned
+
+| Issue / Goal | Optimization & Result |
+| :--- | :--- |
+| **Algorithm Optimization** | Improved computational efficiency by redesigning logic with a **prefix sum algorithm** |
+| **Query Tuning** | Optimized query execution plans using **composite indexes** and pagination |
+| **Caching Strategy** | Applied a **Redis Write-Back** strategy for write-heavy workloads to reduce DB load and improve response speed |
+| **Network Overhead** | Reduced serialization payload size and improved relay performance by replacing JSON-based communication with **gRPC** |
