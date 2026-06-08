@@ -100,21 +100,17 @@ public class MessageService {
         String LAST_READ_KEY = "lastRead:user:%d:chat:%d";
         String DIRTY_SET_KEY = "lastRead:dirty_keys";
 
-        Message lastMessage = messageRepository.findById(dto.getLastMessageId())
-                .orElseThrow(() -> new IllegalArgumentException("메시지를 찾을 수 없습니다."));
-
-        // [수정 1] findByUserIdAndChatId에 비관적 락이 적용되어 동시성 문제 방지
-        // [수정 2] 비관적락의 비효율성으로 인한 추가 수정 -> 쿼리를 통한 최적화
+        Long lastMessageId = dto.getLastMessageId();
 
         try {
             Long result = redisTemplateForString.execute(
                     lastReadUpdateScript,
                     List.of(LAST_READ_KEY, DIRTY_SET_KEY),
-                    lastMessage.getId().toString()
+                    lastMessageId.toString()
             );
 
-            if (result != null && result == 1L) {
-                log.info("✅ [Lua-Atomic] user={}, chat={}, lastMessageId={}", curUserId, chatId, lastMessage.getId());
+            if (result == 1L) {
+                log.info("✅ [Lua-Atomic] user={}, chat={}, lastMessageId={}", curUserId, chatId, lastMessageId);
             } else {
                 log.info("ℹ️ [Skipped] 기존 메시지보다 작거나 동일한 ID → 업데이트 안함");
             }
@@ -123,11 +119,7 @@ public class MessageService {
             log.error("❌ Redis Lua script failed for user={}, chat={}, error={}", curUserId, chatId, e.getMessage());
         }
     }
-    // @Query(update userchat last_read_message_id = 11 ... last_read_message_id < 11)
 
-    // @Query(update userchat last_read_message_id = 10 ... last_read_Message_id < 10)
-
-    // update age = age +1 where month = 4;
 
     // == 메세지 목록  및 안 읽은 사람 수 반환 API == O ( M + N ) == //
     // @Transactional(readOnly = true)
