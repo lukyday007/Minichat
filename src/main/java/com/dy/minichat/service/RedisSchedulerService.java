@@ -82,7 +82,8 @@ public class RedisSchedulerService {
         try {
             userChatJdbcRepository.batchUpdateLastRead(batch);
 
-            // 성공한 키 Dirty Set에서 제거
+            // DB 반영 완료 후 Redis lastRead 캐시 삭제
+            // Dirty Set은 pop() 시점에 이미 제거됨
             String[] keysToRemoveFromCache = batch.stream()
                     .map(UserChatJdbcRepository.UserChatUpdate::getDirtyKey)
                     .toArray(String[]::new);
