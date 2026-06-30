@@ -1,8 +1,9 @@
-# 🚀 MiniChat - 대규모 트래픽 처리를 위한 실시간 채팅 서버
+# 🚀 MiniChat - 실시간 채팅 서비스
 
 > 📌 English version is available below. Scroll down to view the English README.
 
-> **대규모 동시 접속 환경을 가정하여 데이터 정합성과 시스템 안정성 확보에 주력한 백엔드 서버**
+> **실시간 채팅 서비스에서 발생하는 동시성·정합성·장애 문제를 데이터 특성 기반으로 판단하고 해결한 개인 프로젝트**
+> 
 > <br>
 > Master-Replica DB 구조와 Redis/Kafka 분산 처리 아키텍처를 도입하여, 실시간성과 대용량 트래픽 처리에 최적화된 서비스를 구현했습니다.
 
