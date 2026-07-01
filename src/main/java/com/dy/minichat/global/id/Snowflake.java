@@ -20,8 +20,21 @@ public class Snowflake {
     public synchronized long nextId() {
         long currentTimestamp = System.currentTimeMillis() - customEpoch;
 
+        // Clock Drift 방어: 시계가 뒤로 가면 따라잡을 때까지 대기
+        while (currentTimestamp < lastTimestamp) {
+            currentTimestamp = System.currentTimeMillis() - customEpoch;
+        }
+
         if (currentTimestamp == lastTimestamp) {
             sequence = sequence + 1;
+
+            // Sequence 오버플로우 방어 (밀리초당 4096개 초과 시)
+            if (sequence > ((1L << SEQUENCE_BITS) - 1)) {
+                while (currentTimestamp <= lastTimestamp) {
+                    currentTimestamp = System.currentTimeMillis() - customEpoch;
+                }
+                sequence = 0;
+            }
         } else {
             sequence = 0;
         }
