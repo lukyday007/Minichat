@@ -192,10 +192,8 @@ public class WebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        // 스프링 프레임워크에 내장된 클래스
         String messagePayload;
         try {
-            // 메시지 DTO를 JSON 문자열로 변환하여 TextMessage 객체 생성 (한 번만 수행)
             messagePayload = objectMapper.writeValueAsString(message);
         } catch (JsonProcessingException e) {
             log.error("메시지 DTO JSON 변환 실패. ChatId: {}", chatId, e);
@@ -203,89 +201,101 @@ public class WebSocketHandler extends TextWebSocketHandler {
         }
         TextMessage textMessage = new TextMessage(messagePayload);
 
-        /*
-            해쉬맵, -> grpc 리퀘스트를 한번에 전송 [ 최적화 ] => 이해정도
-         */
-
-        // 각 유저 ID에 해당하는 WebSocketSession을 찾아 메시지 전송.
-        // [수정] 1. 수신자 그룹화: 로컬 / 원격(서버별) / 오프라인
-        Map<String, List<Long>> remoteRelayMap = new HashMap<>();
-        List<WebSocketSession> localSessions = new ArrayList<>();
-        List<Long> offlineUserList = new ArrayList<>();
+        // Phase 1: 유저 분류 — 로컬 세션 보유 여부로 분리
+        List<Long> localUserIds = new ArrayList<>();
+        List<Long> remoteOrOfflineUserIds = new ArrayList<>();
 
         for (Long userId : userIdsInChat) {
-            WebSocketSession receiverSession = sessionManager.getSession(userId);
-
-            // Case 1: 같은 서버 (로컬 전송 대상)
-            if (receiverSession != null && receiverSession.isOpen()) {
-                localSessions.add(receiverSession);
-            }
-            // Case 2: 다른 서버 또는 오프라인
-            else {
-                String redisKey = USER_SERVER_KEY_PREFIX + userId;
-                String targetServerId = redisTemplateForString.opsForValue().get(redisKey);
-
-                // Case 2-A: 다른 서버 (gRPC 벌크 릴레이 대상)
-                if (targetServerId != null && !targetServerId.equals(serverIdentifier)) {
-                    remoteRelayMap
-                            .computeIfAbsent(targetServerId, k -> new ArrayList<>())
-                            .add(userId);
-                }
-                // Case 2-B: 오프라인 (FCM 대상)
-                else {
-                    offlineUserList.add(userId);
-                }
+            WebSocketSession session = sessionManager.getSession(userId);
+            if (session != null && session.isOpen()) {
+                localUserIds.add(userId);
+            } else {
+                remoteOrOfflineUserIds.add(userId);
             }
         }
 
-        //      (처리 1) 로컬 세션에 병렬 전송
-        localSessions.forEach(session -> {
+        // Phase 2: 로컬 유저 — WebSocket 직접 전달
+        for (Long userId : localUserIds) {
             executor.execute(() -> {
-                try {
-                    session.sendMessage(textMessage);
-                } catch (IOException e) {
-                    log.error("로컬 전송 실패. 수신자 ID: {}", getUserIdFromSession(session).orElse(0L), e);
+                WebSocketSession session = sessionManager.getSession(userId);
+
+                if (session != null && session.isOpen()) {
+                    try {
+                        session.sendMessage(textMessage);
+                        log.info("로컬 메시지 전송 성공. 수신자: {}", userId);
+
+                    } catch (IOException e) {
+                        log.error("메시지 전송 실패. 수신자: {}", userId, e);
+                    }
                 }
             });
-        });
+        }
 
-        //      (처리 2) 원격 서버에 벌크 gRPC 릴레이 (서버 수만큼만 호출)
-        remoteRelayMap.forEach((targetServerId, recipientIds) -> {
-            log.info("벌크 gRPC 릴레이 시도. 대상 서버: {}, 수신자 수: {}", targetServerId, recipientIds.size());
-            // [신규] 벌크 릴레이 헬퍼 호출
-            relayMessageViaGrpcBulk(targetServerId, message, recipientIds);
-        });
+        if (remoteOrOfflineUserIds.isEmpty()) {
+            return;
+        }
 
-        //      (처리 3) 오프라인 유저에게 FCM 병렬 전송
-        offlineUserList.forEach(userId -> {
+        // Phase 3: Redis MGET — 원격 유저의 서버 위치를 한 번에 조회
+        List<String> redisKeys = remoteOrOfflineUserIds.stream()
+                .map(id -> USER_SERVER_KEY_PREFIX + id)
+                .toList();
+
+        List<String> serverIds = redisTemplateForString.opsForValue().multiGet(redisKeys);
+
+        // Phase 4: 서버별 그룹핑
+        Map<String, List<Long>> serverToRecipients = new HashMap<>();
+        List<Long> offlineUserIds = new ArrayList<>();
+
+        for (int i = 0; i < remoteOrOfflineUserIds.size(); i++) {
+            Long userId = remoteOrOfflineUserIds.get(i);
+            String targetServerId = (serverIds != null) ? serverIds.get(i) : null;
+
+            if (targetServerId != null && !targetServerId.equals(serverIdentifier)) {
+                serverToRecipients
+                        .computeIfAbsent(targetServerId, k -> new ArrayList<>())
+                        .add(userId);
+            } else {
+                offlineUserIds.add(userId);
+            }
+        }
+
+        // Phase 5: 서버별 벌크 gRPC 릴레이
+        serverToRecipients.forEach((targetServerId, recipientIds) -> {
             executor.execute(() -> {
-                log.info("FCM 알림 시도: 유저 {}", userId);
-                // DB 저장 및 푸시 전송
-                saveUndeliveredAndSendPush(chatId, userId, message);
+                log.info("벌크 릴레이 시도. 대상 서버 {}", targetServerId);
+                relayBulkMessageViaGrpc(
+                        targetServerId,
+                        message,
+                        recipientIds
+                );
             });
         });
+
+        // Phase 6: 오프라인 유저 — 배치 저장 + FCM
+        if (!offlineUserIds.isEmpty()) {
+            List<UndeliveredMessage> undeliveredMessages = offlineUserIds.stream()
+                    .map(userId -> UndeliveredMessage.builder()
+                            .id(undeliveredMessageIdGenerator.generate())
+                            .chatId(chatId)
+                            .senderId(message.getSenderId())
+                            .receiverId(userId)
+                            .content(message.getContent())
+                            .build())
+                    .toList();
+
+            undeliveredMessageRepository.saveAll(undeliveredMessages);
+            log.info("오프라인 메시지 배치 저장 완료. {}건", undeliveredMessages.size());
+
+            offlineUserIds.forEach(userId ->
+                    fcmPushService.sendPushNotification(userId, message));
+        }
     }
 
-    /**
-     * [신규] FCM 처리 헬퍼 메서드
-     */
-    private void saveUndeliveredAndSendPush(Long chatId, Long userId, TalkMessageDTO message) {
-        UndeliveredMessage undelivered = UndeliveredMessage.builder()
-                .id(undeliveredMessageIdGenerator.generate())
-                .chatId(chatId)
-                .senderId(message.getSenderId())
-                .receiverId(userId)
-                .content(message.getContent())
-                .build();
-        undeliveredMessageRepository.save(undelivered);
-        fcmPushService.sendPushNotification(userId, message);
-    }
 
     /**
      * [신규] 벌크 gRPC 릴레이를 위한 헬퍼 메서드
      */
-    private void relayMessageViaGrpcBulk(String targetServerId, TalkMessageDTO messageDTO, List<Long> recipientIds) {
-        // 1. 설정에서 서버 주소록을 가져오기
+    private void relayBulkMessageViaGrpc(String targetServerId, TalkMessageDTO messageDTO, List<Long> recipientIds) {
         Map<String, String> addresses = grpcServerProperties.getAddresses();
         String targetAddress = addresses.get(targetServerId);
 
@@ -295,18 +305,19 @@ public class WebSocketHandler extends TextWebSocketHandler {
         }
 
         try {
-            // 2. 주소를 host와 port로 분리
             String[] parts = targetAddress.split(":");
             String host = parts[0];
             int port = Integer.parseInt(parts[1]);
 
-            // 3. MessageRelayClient의 [신규] 벌크 메서드 호출
             messageRelayClient.relayBulkMessageToServer(host, port, messageDTO, recipientIds);
 
+        } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
+            log.error("gRPC 벌크 릴레이 실패: 주소 형식 오류. 서버: '{}', 주소: {}", targetServerId, targetAddress, e);
         } catch (Exception e) {
-            log.error("gRPC 벌크 릴레이 중 예상치 못한 에러 발생. 대상 서버: {}", targetServerId, e);
+            log.error("gRPC 벌크 릴레이 중 예상치 못한 에러. 대상 서버: {}", targetServerId, e);
         }
     }
+
 
     @Override
     public void afterConnectionClosed (WebSocketSession session, CloseStatus status) throws Exception {
@@ -340,37 +351,6 @@ public class WebSocketHandler extends TextWebSocketHandler {
         log.info("[연결 종료] Redis 사용자 위치 정보 삭제. Key: {}", userKey);
     }
 
-    /*
-        메세지를 다른 서버에 보냄
-        1000 방 , ㄱ 서버에 유저들이 잇는데 (약 100명), ㄴ 서버에 (50명)
-        ㄱ 서버에 100 리퀘스트를 다 요청 상황 - 포문 방식
-        ㄱ 서버에는 벌크로 요청하는 릴레이로 개선
-     */
-    private void relayMessageViaGrpc (String targetServerId, TalkMessageDTO messageDTO, Long recipientId) {
-        // 1. 설정에서 서버 주소록을 가져오기
-        Map<String, String> addresses = grpcServerProperties.getAddresses();
-        String targetAddress = addresses.get(targetServerId);
-
-        if (targetAddress == null || targetAddress.isEmpty()) {
-            log.error("gRPC 릴레이 실패: 대상 서버 '{}'의 주소를 찾을 수 없습니다.", targetServerId);
-            return;
-        }
-
-        try {
-            // 2. 주소를 host와 port로 분리 (e.g., "localhost:9091")
-            String[] parts = targetAddress.split(":");
-            String host = parts[0];
-            int port = Integer.parseInt(parts[1]);
-
-            // 3. MessageRelayClient를 사용하여 gRPC 요청 송신
-            messageRelayClient.relayMessageToServer(host, port, messageDTO, recipientId);
-
-        } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
-            log.error("gRPC 릴레이 실패: 대상 서버 '{}'의 주소 형식이 올바르지 않습니다. (address: {})", targetServerId, targetAddress, e);
-        } catch (Exception e) {
-            log.error("gRPC 릴레이 중 예상치 못한 에러 발생. 대상 서버: {}", targetServerId, e);
-        }
-    }
 
     private Optional<Long> getUserIdFromSession (WebSocketSession session) {
         try {
@@ -397,7 +377,6 @@ public class WebSocketHandler extends TextWebSocketHandler {
             return Optional.empty(); // 예외 발생 시에도 안전하게 빈 Optional 반환
         }
     }
-
 
     private Optional<Long> getCurrentChatIdForUser(Long userId) {
         try {
