@@ -1,7 +1,6 @@
 package com.dy.minichat.grpc.server;
 
 import com.dy.grpc.proto.RelayBulkMessageRequest;
-import com.dy.grpc.proto.RelayMessageRequest;
 import com.dy.grpc.proto.RelayMessageResponse;
 import com.dy.grpc.proto.RelayMessageServiceGrpc;
 import com.dy.minichat.component.WebSocketSessionManager;
