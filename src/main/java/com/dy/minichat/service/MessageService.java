@@ -97,9 +97,10 @@ public class MessageService {
     // == 메세지 읽음 상태 업데이트 API == //
     public void updateLastReadMessage (LastReadMessageRequestDTO dto, Long curUserId, Long chatId) {
 
-        String LAST_READ_KEY = "lastRead:user:%d:chat:%d";
+        String LAST_READ_KEY_TEMPLATE = "lastRead:user:%d:chat:%d";
         String DIRTY_SET_KEY = "lastRead:dirty_keys";
 
+        String LAST_READ_KEY = String.format(LAST_READ_KEY_TEMPLATE, curUserId, chatId);
         Long lastMessageId = dto.getLastMessageId();
 
         try {
