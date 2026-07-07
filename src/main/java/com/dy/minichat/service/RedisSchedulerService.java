@@ -46,14 +46,18 @@ public class RedisSchedulerService {
 
         for (String key : dirtyKeys) {
             try {
+
+                String[] parsedIds = parseAndValidateKey(key);
+                if (parsedIds == null) {
+                    log.warn("[Invalid Key] 형식이 맞지 않는 키 발견 (스킵): {}", key);
+                    continue;
+                }
+
                 Long lastMessageId = redisTemplateForLong.opsForValue().get(key);
                 if (lastMessageId == null) continue;
 
-                String[] parts = key.split(":");
-                if (parts.length < 6) continue;
-
-                Long userId = Long.parseLong(parts[2]);
-                Long chatId = Long.parseLong(parts[4]);
+                Long userId = Long.parseLong(parsedIds[0]);
+                Long chatId = Long.parseLong(parsedIds[1]);
 
                 batchList.add(new UserChatJdbcRepository.UserChatUpdate(
                         userId, chatId, lastMessageId, key
@@ -75,7 +79,25 @@ public class RedisSchedulerService {
             executeBatch(batchList);
         }
 
-        log.info("✅ Redis → DB sync complete.");
+        log.info("Redis → DB sync complete.");
+    }
+
+    private String[] parseAndValidateKey(String key) {
+        if (key == null) return null;
+
+        String[] parts = key.split(":");
+
+        // "lastRead:user:123:chat:456" 은 정확히 5조각이어야 함
+        if (parts.length != 5) {
+            return null;
+        }
+
+        if (!"lastRead".equals(parts[0]) || !"user".equals(parts[1]) || !"chat".equals(parts[3])) {
+            return null;
+        }
+
+        // [userId, chatId] 반환
+        return new String[]{parts[2], parts[4]};
     }
 
     private void executeBatch(List<UserChatJdbcRepository.UserChatUpdate> batch) {
@@ -90,10 +112,10 @@ public class RedisSchedulerService {
 
             redisTemplateForLong.delete(List.of(keysToRemoveFromCache));
 
-            log.info("📦 Batch of {} keys synced to DB.", batch.size());
+            log.info("Batch of {} keys synced to DB.", batch.size());
 
         } catch (Exception e) {
-            log.error("❌ Batch DB update failed, will retry next schedule.", e);
+            log.error("Batch DB update failed, will retry next schedule.", e);
 
             // 실패 시 Dirty Set 유지 → 다음 스케줄러에서 재시도
             String[] keysToReAdd = batch.stream()
