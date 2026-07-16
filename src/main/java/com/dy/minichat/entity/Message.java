@@ -27,7 +27,7 @@ public class Message {
     @JoinColumn(name = "chat_id", nullable = false)
     private Chat chat;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
     @Enumerated(EnumType.STRING)
