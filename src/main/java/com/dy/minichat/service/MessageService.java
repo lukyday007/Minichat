@@ -1,7 +1,7 @@
 package com.dy.minichat.service;
 
 // import com.dy.minichat.component.TaskManager;
-import com.dy.minichat.config.id.MessageIdGenerator;
+import com.dy.minichat.global.id.MessageIdGenerator;
 import com.dy.minichat.dto.request.LastReadMessageRequestDTO;
 import com.dy.minichat.dto.request.MessageRequestDTO;
 import com.dy.minichat.dto.response.MessageResponseDTO;

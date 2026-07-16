@@ -1,7 +1,7 @@
 package com.dy.minichat.service;
 
-import com.dy.minichat.component.JwtTokenProvider;
-import com.dy.minichat.config.id.UserIdGenerator;
+import com.dy.minichat.global.security.JwtTokenProvider;
+import com.dy.minichat.global.id.UserIdGenerator;
 import com.dy.minichat.dto.request.LoginRequestDTO;
 import com.dy.minichat.dto.request.SignUpRequestDTO;
 import com.dy.minichat.dto.response.LoginResponseDTO;
