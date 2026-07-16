@@ -38,6 +38,10 @@ dependencies {
 	implementation 'org.springframework.kafka:spring-kafka'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 
+	// 관측성 (Actuator + Prometheus)
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'io.micrometer:micrometer-registry-prometheus'
+
 	// gRPC 관련 라이브러리 (서버와 클라이언트 모두 추가)
 	implementation 'com.google.guava:guava:32.1.3-jre'
 	implementation 'net.devh:grpc-server-spring-boot-starter:3.1.0.RELEASE'
