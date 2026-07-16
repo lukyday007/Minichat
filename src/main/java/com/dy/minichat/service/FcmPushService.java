@@ -5,6 +5,7 @@ import com.dy.minichat.repository.UserRepository;
 import com.dy.minichat.entity.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -17,7 +18,13 @@ public class FcmPushService {
     private final FcmTokenService fcmTokenService; // 유저의 FCM 토큰 조회용
     private final UserRepository userRepository;
 
+    @Value("${firebase.enabled:false}")
+    private boolean firebaseEnabled;
+
     public void sendPushNotification(Long recipientId, TalkMessageDTO messageDTO) {
+
+        if (!firebaseEnabled) return;   // 로드테스트에선 아무것도 안 함
+
         String token = fcmTokenService.getTokenByUserId(recipientId);
 
         String senderName = userRepository.findById(messageDTO.getSenderId())
