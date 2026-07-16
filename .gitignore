@@ -45,3 +45,5 @@ src/main/resources/application.yml
 minichat-compose.yml
 Dockerfile
 src/main/resources/firebase-service-account.json
+grafana-datasource.yml
+prometheus.yml
