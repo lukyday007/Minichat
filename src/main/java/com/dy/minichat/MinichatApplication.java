@@ -17,12 +17,4 @@ public class MinichatApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(MinichatApplication.class, args);
 	}
-
-	@Value("${jwt.secret}")
-	private String jwtSecret;
-
-	@PostConstruct
-	public void post() {
-		log.info("[JWT-DEBUG] secret first 32 chars: {}", jwtSecret.substring(0, 32));
-	}
 }
