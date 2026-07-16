@@ -33,7 +33,7 @@ public class JwtTokenProvider {
         Date expiryDate = new Date(now.getTime() + ACCESS_TOKEN_EXP);
 
         return Jwts.builder()
-                .setSubject(String.valueOf(userId)) // 토큰의 "주제" (사용자 ID)
+                .setSubject(String.valueOf(userId)) // (사용자 ID)
                 .setIssuedAt(now)                   // 발행 시간
                 .setExpiration(expiryDate)          // 만료 시간
                 .signWith(key)                      // [수정] 이미 HS256이므로 key만 사용
@@ -41,7 +41,7 @@ public class JwtTokenProvider {
     }
 
     /**
-     * 사용자 ID를 기반으로 Refresh Token 생성
+     * 사용자 ID를 기반 Refresh Token 생성
      */
     public String generateRefreshToken(Long userId) {
         Date now = new Date();
@@ -51,13 +51,13 @@ public class JwtTokenProvider {
                 .setSubject(String.valueOf(userId))
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
-                .signWith(key)                      // [수정] 통일
+                .signWith(key)
                 .compact();
     }
 
 
     /**
-     * 토큰의 유효성을 검증합니다.
+     * 토큰 유효성 검증
      */
     public boolean validateToken(String token) {
         try {
@@ -79,8 +79,8 @@ public class JwtTokenProvider {
     }
 
     /**
-     * 토큰에서 사용자 ID (Subject)를 추출합니다.
-     * (만료된 토큰의 경우 ExpiredJwtException이 발생합니다.)
+     * 토큰에서 사용자 ID (Subject)를 추출.
+     * (만료된 토큰의 경우 ExpiredJwtException이 발생)
      */
     public Long getUserIdFromToken(String token) {
         Claims claims = Jwts.parserBuilder()
