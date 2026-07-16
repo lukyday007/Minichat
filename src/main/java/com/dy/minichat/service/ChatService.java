@@ -1,12 +1,11 @@
 package com.dy.minichat.service;
 
-import com.dy.minichat.config.id.ChatIdGenerator;
-import com.dy.minichat.config.id.UserChatIdGenerator;
+import com.dy.minichat.global.id.ChatIdGenerator;
+import com.dy.minichat.global.id.UserChatIdGenerator;
 import com.dy.minichat.dto.request.ChatRequestDTO;
 import com.dy.minichat.dto.request.InviteRequestDTO;
 import com.dy.minichat.dto.response.UserChatResponseDTO;
 import com.dy.minichat.entity.*;
-import com.dy.minichat.event.SystemMessageEvent;
 import com.dy.minichat.repository.ChatRepository;
 import com.dy.minichat.repository.UserChatRepository;
 import com.dy.minichat.repository.UserRepository;
@@ -36,9 +35,6 @@ public class ChatService {
     private final ChatIdGenerator chatIdGenerator;
     private final UserChatIdGenerator userChatIdGenerator;
 
-    // [추가] 이벤트 발행기 주입 -> Kafka로 수정
-    private final ApplicationEventPublisher eventPublisher;
-
     @Qualifier("redisTemplateForString")
     private final RedisTemplate<String, String> redisTemplateForString;
     private final String serverIdentifier;
@@ -51,9 +47,7 @@ public class ChatService {
         // K: roomId, V: 해당 방에 있는 userId Set
         // key: 채팅방 ID, value: 해당 채팅방에 연결된 WebSocket 세션들의 집합
         private final Map<Long, Set<Long>> chatToUsers = new ConcurrentHashMap<>();
-
     */
-
 
     // == 채팅방 API == //
     @Transactional

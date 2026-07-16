@@ -1,13 +1,11 @@
 package com.dy.minichat.service;
 
 import com.dy.minichat.entity.Message;
-import com.dy.minichat.event.UserChatUpdateEvent;
-import com.dy.minichat.kafka.producer.UserChatUpdateProducer;
+import com.dy.minichat.global.infra.kafka.payload.UserChatUpdatePayload;
+import com.dy.minichat.global.infra.kafka.producer.UserChatUpdateProducer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -65,7 +63,7 @@ public class UserChatUpdateService {
     // 카프카 Async 둘 중 하나만 선택 -> only use kafka
     @Transactional
     public void updateUserChatOnNewMessage(Long chatId, Message lastMessage) {
-        UserChatUpdateEvent event = UserChatUpdateEvent.builder()
+        UserChatUpdatePayload event = UserChatUpdatePayload.builder()
                 .chatId(chatId)
                 .lastMessageId(lastMessage.getId())
                 .timestamp(lastMessage.getCreatedAt())
