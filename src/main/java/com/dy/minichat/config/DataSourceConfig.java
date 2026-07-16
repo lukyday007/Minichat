@@ -22,7 +22,6 @@ public class DataSourceConfig {
 
     // 로그 찍기용 createDataSource
     public DataSource createDataSource(String key, String url, String username, String password) {
-        System.out.println("     └─ createReplicaDataSourceConfig [" + key + "]");
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl(url);
         config.setUsername(username);
