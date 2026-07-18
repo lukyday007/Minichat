@@ -70,12 +70,6 @@ public class WebSocketHandler extends TextWebSocketHandler {
         */
         // Handshake 인터셉터에서 userId를 넣어주기
 
-        log.info("--- WebSocket Connection Established ---");
-        log.info("Session ID: {}", session.getId());
-        log.info("Connection URI: {}", session.getUri());
-        log.info("Session Attributes: {}", session.getAttributes());
-        log.info("------------------------------------");
-
         Optional<Long> userIdOptional = getUserIdFromSession(session);
 
         // userId가 존재할 경우에만 연결 수립 로직 진행
@@ -89,14 +83,16 @@ public class WebSocketHandler extends TextWebSocketHandler {
             if (chatIdStr != null) {
                 // 로컬 메모리에 세션 저장
                 sessionManager.addSession(userId, session);
+
                 // redis - user : chat
                 redisTemplateForString.opsForHash().put(userKey, "serverId", serverIdentifier);
                 redisTemplateForString.opsForHash().put(userKey, "lastActive", LocalDateTime.now().toString());
+
                 // redis - user : server
                 String redisKey = USER_SERVER_KEY_PREFIX + userId;
                 redisTemplateForString.opsForValue().set(redisKey, serverIdentifier);
-                log.info("유저 {} → 서버 [{}] 등록 완료", userId, serverIdentifier);
 
+                log.info("유저 {} → 서버 [{}] 등록 완료", userId, serverIdentifier);
                 log.info("유저 {}가 채팅방 {}에 연결됨, server log = {}", userId, chatIdStr, serverIdentifier);
             } else {
                 log.warn("유저 {}의 chatId 정보가 없음 — API 미호출 가능성 있음", userId);
@@ -112,6 +108,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
 
@@ -125,14 +122,12 @@ public class WebSocketHandler extends TextWebSocketHandler {
 
         String payload = message.getPayload();
         TalkMessageDTO talkMessageDTO = objectMapper.readValue(payload, TalkMessageDTO.class);
-        log.info("Received DTO (JSON): {}", objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(talkMessageDTO));
 
         Optional<Long> chatIdOpt = getCurrentChatIdForUser(senderId);
         if (chatIdOpt.isEmpty()) {
             log.warn("[메시지 무시] user:{} 의 Redis상 chatId 정보가 없음 (채팅방 미입장 상태)", senderId);
             return;
         }
-
         if (!chatIdOpt.get().equals(talkMessageDTO.getChatId())) {
             log.warn("[메시지 무시] user:{} 의 Redis상 chatId({})가 수신 메시지의 chatId({})와 다름",
                     senderId, chatIdOpt.get(), talkMessageDTO.getChatId());
@@ -146,21 +141,17 @@ public class WebSocketHandler extends TextWebSocketHandler {
         switch (talkMessageDTO.getType()) {
 
             case TALK:
-                // DB 저장
+                // 선 DB 저장
                 messageService.createMessage(
                         new MessageRequestDTO(talkMessageDTO.getContent()), senderId, chatId
                 );
 
-                // 해당 채팅방의 모든 세션에게 메시지 방송
-                // kafkaProducer.send(new MessageSendEvent());
-                // 컨슈머가 받아서 안정적 처리
-                // Kafka로 이벤트 발행 (수정된 부분)
+                // 카프카 패이로드 조립 후 프로듀서에게 위임 -> 컨슈머가 받아서 안정적 처리 => 만약 안되면? (그래서 먼저 디비에 저장)
                 ChatMessagePayload event = ChatMessagePayload.builder()
                         .talkMessage(talkMessageDTO)
                         .build();
-                chatMessageProducer.send(event); // 프로듀서에게 위임
+                chatMessageProducer.send(event);
 
-                // sendMessageToChatRoom(talkMessageDTO);
                 log.info("[메시지] 보낸사람: {}, 채팅방: {}, 내용: {}", senderId, chatId, talkMessageDTO.getContent());
                 break;
 
@@ -168,9 +159,9 @@ public class WebSocketHandler extends TextWebSocketHandler {
             default:
                 log.warn("처리할 수 없는 메시지 타입({}) 수신", talkMessageDTO.getType());
                 break;
-
         }
     }
+
 
     // [신규 추가] Kafka Consumer가 호출할 public 메서드 -> private sendMessageToChatRoom
     public void broadcastMessage(TalkMessageDTO message) {
@@ -203,7 +194,22 @@ public class WebSocketHandler extends TextWebSocketHandler {
         // Phase 1: 유저 분류 — 로컬 세션 보유 여부로 분리
         List<Long> localUserIds = new ArrayList<>();
         List<Long> remoteOrOfflineUserIds = new ArrayList<>();
+        classifyUsers(userIdsInChat, localUserIds, remoteOrOfflineUserIds);
 
+        // Phase 2: 로컬 유저 — WebSocket 직접 전달
+        sendToLocalUsers(localUserIds, textMessage);
+
+        if (remoteOrOfflineUserIds.isEmpty()) {
+            return;
+        }
+
+        // Phase 3~6: 원격/오프라인 유저 처리 (Redis 조회 → 서버별 릴레이 → 오프라인 저장)
+        handleRemoteAndOfflineUsers(remoteOrOfflineUserIds, message, chatId);
+    }
+
+
+    // Phase 1: 유저 분류 — 로컬 세션 보유 여부로 분리
+    private void classifyUsers(Set<Long> userIdsInChat, List<Long> localUserIds, List<Long> remoteOrOfflineUserIds) {
         for (Long userId : userIdsInChat) {
             WebSocketSession session = sessionManager.getSession(userId);
             if (session != null && session.isOpen()) {
@@ -212,8 +218,11 @@ public class WebSocketHandler extends TextWebSocketHandler {
                 remoteOrOfflineUserIds.add(userId);
             }
         }
+    }
 
-        // Phase 2: 로컬 유저 — WebSocket 직접 전달
+
+    // Phase 2: 로컬 유저 — WebSocket 직접 전달
+    private void sendToLocalUsers(List<Long> localUserIds, TextMessage textMessage) {
         for (Long userId : localUserIds) {
             executor.execute(() -> {
                 WebSocketSession session = sessionManager.getSession(userId);
@@ -229,17 +238,24 @@ public class WebSocketHandler extends TextWebSocketHandler {
                 }
             });
         }
+    }
 
-        if (remoteOrOfflineUserIds.isEmpty()) {
-            return;
-        }
+
+    // Phase 3~6: 원격 유저 서버 위치 조회 → 서버별 gRPC 릴레이 → 오프라인 유저 저장/FCM
+    private void handleRemoteAndOfflineUsers(List<Long> remoteOrOfflineUserIds, TalkMessageDTO message, Long chatId) {
 
         // Phase 3: Redis MGET — 원격 유저의 서버 위치를 한 번에 조회
         List<String> redisKeys = remoteOrOfflineUserIds.stream()
                 .map(id -> USER_SERVER_KEY_PREFIX + id)
                 .toList();
 
-        List<String> serverIds = redisTemplateForString.opsForValue().multiGet(redisKeys);
+        List<String> serverIds;
+        try {
+            serverIds = redisTemplateForString.opsForValue().multiGet(redisKeys);
+        } catch (Exception e) {
+            log.error("[원격 전파 실패] Redis MGET 중 인프라 에러. 원격/오프라인 유저 전파를 건너뜁니다. chatId: {}", chatId, e);
+            return;
+        }
 
         // Phase 4: 서버별 그룹핑
         Map<String, List<Long>> serverToRecipients = new HashMap<>();
@@ -272,26 +288,32 @@ public class WebSocketHandler extends TextWebSocketHandler {
 
         // Phase 6: 오프라인 유저 — 배치 저장 + FCM
         if (!offlineUserIds.isEmpty()) {
-            List<UndeliveredMessage> undeliveredMessages = offlineUserIds.stream()
-                    .map(userId -> UndeliveredMessage.builder()
-                            .id(undeliveredMessageIdGenerator.generate())
-                            .chatId(chatId)
-                            .senderId(message.getSenderId())
-                            .receiverId(userId)
-                            .content(message.getContent())
-                            .build())
-                    .toList();
-
-            undeliveredMessageRepository.saveAll(undeliveredMessages);
-            log.info("오프라인 메시지 배치 저장 완료. {}건", undeliveredMessages.size());
-
-            offlineUserIds.forEach(userId ->
-                    fcmPushService.sendPushNotification(userId, message));
+            saveOfflineMessages(offlineUserIds, message, chatId);
         }
     }
 
 
-    /**
+    // Phase 6 세부: 오프라인 유저 미전달 메시지 배치 저장 + FCM 발송
+    private void saveOfflineMessages(List<Long> offlineUserIds, TalkMessageDTO message, Long chatId) {
+        List<UndeliveredMessage> undeliveredMessages = offlineUserIds.stream()
+                .map(userId -> UndeliveredMessage.builder()
+                        .id(undeliveredMessageIdGenerator.generate())
+                        .chatId(chatId)
+                        .senderId(message.getSenderId())
+                        .receiverId(userId)
+                        .content(message.getContent())
+                        .build())
+                .toList();
+
+        undeliveredMessageRepository.saveAll(undeliveredMessages);
+        log.info("오프라인 메시지 배치 저장 완료. {}건", undeliveredMessages.size());
+
+        offlineUserIds.forEach(userId ->
+                fcmPushService.sendPushNotification(userId, message));
+    }
+
+
+    /*
      * [신규] 벌크 gRPC 릴레이를 위한 헬퍼 메서드
      */
     private void relayBulkMessageViaGrpc(String targetServerId, TalkMessageDTO messageDTO, List<Long> recipientIds) {
@@ -361,7 +383,6 @@ public class WebSocketHandler extends TextWebSocketHandler {
                 log.error("세션(ID: {})에 'userId' 속성이 존재하지 않습니다. HandshakeInterceptor 설정을 확인하세요.", session.getId());
                 return Optional.empty();
             }
-
 
             // userId 속성이 존재하고, Long 타입인지 확인
             if (userIdObj instanceof Long) {

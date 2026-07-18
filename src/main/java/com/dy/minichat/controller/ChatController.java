@@ -2,6 +2,7 @@ package com.dy.minichat.controller;
 
 import com.dy.minichat.dto.request.ChatRequestDTO;
 import com.dy.minichat.dto.request.InviteRequestDTO;
+import com.dy.minichat.dto.response.ChatResponseDTO;
 import com.dy.minichat.dto.response.UserChatResponseDTO;
 import com.dy.minichat.global.model.BaseResponseBody;
 import com.dy.minichat.service.ChatService;
@@ -21,12 +22,11 @@ public class ChatController {
 
     // == 채팅방 생성 API == //
     @PostMapping("/chat")
-    public ResponseEntity<BaseResponseBody> createChat(
+    public ResponseEntity<ChatResponseDTO> createChat(
             @AuthenticationPrincipal Long creatorId,
             @RequestBody ChatRequestDTO request
     ) {
-        chatService.createChat(creatorId, request);
-        return ResponseEntity.status(201).body(BaseResponseBody.of(201, "채팅방 등록 성공."));
+        return ResponseEntity.status(201).body(chatService.createChat(creatorId, request));
     }
 
     // == 특정 생성방에 입장하는 API = //
@@ -46,8 +46,6 @@ public class ChatController {
             // 인증된 사용자 정보
             @AuthenticationPrincipal Long userId
     ) {
-        // Long userId = 1L; // 임시
-
         chatService.leaveChatRoom(userId, chatId);
         return ResponseEntity.status(200).body(BaseResponseBody.of(200, "채팅방을 나갔습니다."));
     }

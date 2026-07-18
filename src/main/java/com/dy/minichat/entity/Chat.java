@@ -17,14 +17,9 @@ public class Chat {
     @Id
     private Long id;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "chatstatus")
-    private ChatStatus status = ChatStatus.DIRECT;
-
     private String title = "untitled";
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
 }
