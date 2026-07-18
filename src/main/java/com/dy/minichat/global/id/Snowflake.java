@@ -19,7 +19,7 @@ public class Snowflake {
 
     public Snowflake(long nodeId) {
 
-        // (c) NodeID 검증 가드 코드 추가: 분산 환경에서 1023(10bit)을 넘어가면 예외 발생
+        // NodeID 검증 가드 코드 추가: 분산 환경에서 1023(10bit)을 넘어가면 예외 발생
         if (nodeId < 0 || nodeId > MAX_NODE_ID) {
             throw new IllegalArgumentException("nodeId는 0에서 " + MAX_NODE_ID + " 사이여야 합니다.");
         }
@@ -31,7 +31,7 @@ public class Snowflake {
     public synchronized long nextId() {
         long currentTimestamp = System.currentTimeMillis() - customEpoch;
 
-        // (a) Clock Drift 대응: 시계가 뒤로 가면 에러를 던져 ID 중복/역행 원천 차단
+        // Clock Drift 대응: 시계가 뒤로 가면 에러를 던져 ID 중복/역행 원천 차단
         if (currentTimestamp < lastTimestamp) {
             throw new RuntimeException(String.format(
                     "Clock moved backwards. Refusing to generate id for %d milliseconds",
@@ -39,7 +39,7 @@ public class Snowflake {
             ));
         }
 
-        // (b) 동일 밀리초 내 오버플로우 대응
+        // 동일 밀리초 내 오버플로우 대응
         if (currentTimestamp == lastTimestamp) {
             // 비트 마스킹(&) 연산으로 안전하게 시퀀스 증가 (4095 넘어가면 0이 됨)
             sequence = (sequence + 1) & SEQUENCE_MASK;
