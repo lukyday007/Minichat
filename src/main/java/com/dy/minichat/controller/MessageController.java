@@ -17,19 +17,6 @@ import java.util.List;
 public class MessageController {
     private final MessageService messageService;
 
-    /*  --> 웹소켓에서 써서 별 소용 없을 듯...?
-        // == 메세지 생성 API == //
-        @PostMapping("/chats/{chatId}/message")
-        public ResponseEntity<BaseResponseBody> createMessage(
-                @RequestParam Long chatId,
-                @RequestParam Long senderId,    // 추후 인증 로직 추가
-                @RequestBody MessageRequestDTO request
-        ) {
-            appService.createMessage(request, senderId, chatId);
-            return ResponseEntity.status(201).body(BaseResponseBody.of(201, "메세지 등록 성공."));
-        }
-    */
-
     // == 메세지 목록 및 안 읽은 사람 수 반환 API == //
     @GetMapping("/chats/{chatId}/messages")
     public ResponseEntity<List<MessageResponseDTO>> getMessageListWithUnreadCounts (
