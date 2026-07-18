@@ -149,13 +149,17 @@ public class ChatService {
 
 
     private void associateUsersWithChat(Chat chat, List<User> users) {
-        for (User user : users) {
-            UserChat userChat = new UserChat();
-            userChat.setId(userChatIdGenerator.generate());
-            userChat.setUser(user);
-            userChat.setChat(chat);
-            userChatRepository.save(userChat);
-        }
+        List<UserChat> userChats = users.stream()
+                .map(user -> {
+                    UserChat userChat = new UserChat();
+                    userChat.setId(userChatIdGenerator.generate());
+                    userChat.setUser(user);
+                    userChat.setChat(chat);
+                    return userChat;
+                })
+                .toList();
+        // .save()에서 병목 발생 -> .saveAll()로 전환
+        userChatRepository.saveAll(userChats);
     }
 
 
