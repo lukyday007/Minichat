@@ -23,6 +23,10 @@ public class UserService {
 
     @Transactional
     public User signUp(SignUpRequestDTO dto) {
+
+        if (dto == null || dto.getEmail() == null || dto.getPassword() == null) {
+            throw new IllegalArgumentException("필수 가입 정보가 누락되었습니다.");
+        }
         if (userRepository.existsByEmail(dto.getEmail())) {
             throw new IllegalArgumentException("이미 사용 중인 ID입니다.");
         }
@@ -43,6 +47,10 @@ public class UserService {
     @Transactional
     public LoginResponseDTO login(LoginRequestDTO requestDTO) {
 
+        if (requestDTO == null || requestDTO.getEmail() == null || requestDTO.getPassword() == null) {
+            throw new IllegalArgumentException("이메일과 비밀번호를 모두 입력해주세요.");
+        }
+
         User user = (User) userRepository.findByEmail(requestDTO.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 이메일입니다."));
 
@@ -54,34 +62,39 @@ public class UserService {
         String accessToken = jwtTokenProvider.generateAccessToken(user.getId());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
 
-        // ✅ Refresh Token 저장 안함 — Stateless 유지
+        // Refresh Token 저장 안함 — Stateless 유지
         return LoginResponseDTO.builder()
                 .accessToken(accessToken)
-                .refreshToken(refreshToken)  // Controller에서 Cookie로 내려줌
+                .refreshToken(refreshToken)
                 .userId(user.getId())
                 .build();
 
     }
 
+
     @Transactional(readOnly = true)
     public LoginResponseDTO reissue(String refreshToken) {
 
-        // 1) Refresh Token 검증
+        if (refreshToken == null || refreshToken.trim().isEmpty()) {
+            throw new IllegalArgumentException("Refresh Token이 인증 정보에 포함되어 있지 않습니다.");
+        }
+
+        // Refresh Token 검증
         if (!jwtTokenProvider.validateToken(refreshToken)) {
             throw new IllegalArgumentException("유효하지 않은 Refresh Token");
         }
 
-        // 2) Refresh Token에서 userId 추출
+        // Refresh Token에서 userId 추출
         Long userId = jwtTokenProvider.getUserIdFromToken(refreshToken);
 
-        // 3) 사용자 존재 여부 확인
+        // 3사용자 존재 여부 확인
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
-        // 4) 새 Access Token 발급
+        // 새 Access Token 발급
         String newAccessToken = jwtTokenProvider.generateAccessToken(userId);
 
-        // 5) 새 Refresh Token 발급 (선택 — rotation 필요하면)
+        // 새 Refresh Token 발급 (선택 — rotation 필요하면)
         String newRefreshToken = jwtTokenProvider.generateRefreshToken(userId);
 
         return LoginResponseDTO.builder()
