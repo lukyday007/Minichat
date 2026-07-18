@@ -18,26 +18,11 @@ public interface UserChatRepository extends JpaRepository<UserChat, Long> {
         Optional<UserChat> findByUserIdAndChatId(Long curUserId, Long chatId);
     */
 
-//    /*
-//     * 마지막으로 읽은 메시지를 조건부로 업데이트합니다.
-//     * @return 업데이트된 행(row)의 수
-//     */
-//    @Modifying // UPDATE, DELETE 쿼리 실행 시 필요
-//    @Query("UPDATE UserChat uc " +
-//            "SET uc.lastReadMessage = :lastMessage " +
-//            "WHERE uc.user.id = :userId AND uc.chat.id = :chatId AND uc.isDeleted = false " +
-//            "AND (uc.lastReadMessage IS NULL OR uc.lastReadMessage.id < :lastMessageId)")
-//    int updateLastReadMessageConditionally(
-//            @Param("userId") Long userId,
-//            @Param("chatId") Long chatId,
-//            @Param("lastMessage") Message lastMessage,
-//            @Param("lastMessageId") Long lastMessageId);
-
     // leaveChatRoom에서 사용
     // find 할 때 메소드 명을 findActiveUserChat -> isDeletedFalse 보다 더 직관적
     Optional<UserChat> findByUserIdAndChatIdAndIsDeletedFalse(Long userId, Long chatId);
 
-    // [추가] 단순 조회용: 락이 없는 메소드를 새로 추가
+    // 단순 조회용: 락이 없는 메소드를 새로 추가
     Optional<UserChat> findReadVersionByUserIdAndChatIdAndIsDeletedFalse(Long userId, Long chatId);
 
     /*
@@ -59,15 +44,13 @@ public interface UserChatRepository extends JpaRepository<UserChat, Long> {
             "ORDER BY uc.lastMessageTimestamp DESC") // 정렬은 timestamp로
     List<UserChat> findAllByUserIdOrderByLastMessageTimestampDesc(@Param("userId") Long userId);
 
-    /*
-        UserChatUpdateService 에서 사용
-     */
-    // List<UserChat> findAllByChatIdAndIsDeletedFalse(Long chatId);
 
-    // [추가] 특정 채팅방에 속한 모든 사용자의 ID 목록만 조회 쿼리
+    // 특정 채팅방에 속한 모든 사용자의 ID 목록만 조회 쿼리
     @Query("SELECT uc.user.id FROM UserChat uc WHERE uc.chat.id = :chatId AND uc.isDeleted = false")
     List<Long> findUserIdsByChatId(@Param("chatId") Long chatId);
 
     @Query("SELECT uc.id FROM UserChat uc WHERE uc.chat.id = :chatId AND uc.isDeleted = false")
     List<Long> findIdsByChatId(@Param("chatId") Long chatId);
+
+    boolean existsByUserIdAndChatIdAndIsDeletedFalse(Long userId, Long chatId);
 }
