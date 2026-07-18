@@ -44,8 +44,12 @@ public class UserBanService { // UserBanServiceCGlibProxy...
 
         // 1. 위반 횟수 1 증가 (INCR)
         Long strikeCount = redisTemplateForString.opsForValue().increment(strikeKey);
+        if (strikeCount == null) {  // 레디스 다운 등으로 미응답 가능성 있음 - 예외처리
+            log.error("[Strike] Redis increment 결과가 null입니다. 밴 처리를 건너뜁니다. userId: {}", userId);
+            return;
+        }
 
-        if (strikeCount == 1) {
+            if (strikeCount == 1) {
             // [Strike 1] 1일 밴 적용
             log.warn("!!! [Strike 1] 사용자 {} 밴 처리 (1일)", userId);
             // "SET ban:state:user:123 "STRIKE_1" EX 86400"
@@ -82,7 +86,7 @@ public class UserBanService { // UserBanServiceCGlibProxy...
                 return;
             }
             user.setUserStatus(UserStatus.BAN);
-            log.warn("🚫 사용자 {} 밴 처리 완료 (DB 업데이트)", userId);
+            log.warn("사용자 {} 밴 처리 완료 (DB 업데이트)", userId);
         }, () -> {
             log.warn("[UserBanService] 존재하지 않는 사용자: {}", userId);
         });
