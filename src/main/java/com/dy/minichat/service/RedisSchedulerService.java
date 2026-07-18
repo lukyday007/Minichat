@@ -36,9 +36,17 @@ public class RedisSchedulerService {
             => 문제 상황: 트래픽이 몰리거나 스케줄러가 잠시 멈춰서 Dirty Set에 100만 개의 키가 쌓이면, 이 코드는 100만 개의 문자열을 메모리에 로드하려다 **OutOfMemoryError(OOM)**로 인해 서버가 다운
          */
 
-        List<String> dirtyKeys = redisTemplateForString.opsForSet().pop(DIRTY_SET_KEY, BATCH_SIZE);
+        List<String> dirtyKeys = null;
+        try {
+            // 네트워크 지연이나 Redis 셧다운으로 인한 스케줄러 쓰레드 전체 폭발 방어
+            dirtyKeys = redisTemplateForString.opsForSet().pop(DIRTY_SET_KEY, BATCH_SIZE);
+        } catch (Exception e) {
+            log.error("[Scheduler] Redis DIRTY_SET 팝 연산 중 인프라 에러 발생", e);
+            return;
+        }
+
         if (dirtyKeys == null || dirtyKeys.isEmpty()) {
-            log.info("⚪ [Scheduler] No dirty keys found.");
+            log.debug("[Scheduler] No dirty keys found.");
             return;
         }
 
@@ -63,6 +71,8 @@ public class RedisSchedulerService {
                         userId, chatId, lastMessageId, key
                 ));
 
+            } catch (NumberFormatException e) {
+                log.error("[Key Parse Error] ID 파싱 실패 (숫자 포맷 아님). key={}", key);
             } catch (Exception e) {
                 log.error("Failed to parse Redis key={}", key, e);
             }
@@ -78,8 +88,6 @@ public class RedisSchedulerService {
         if (!batchList.isEmpty()) {
             executeBatch(batchList);
         }
-
-        log.info("Redis → DB sync complete.");
     }
 
     private String[] parseAndValidateKey(String key) {
@@ -101,6 +109,8 @@ public class RedisSchedulerService {
     }
 
     private void executeBatch(List<UserChatJdbcRepository.UserChatUpdate> batch) {
+        if (batch == null || batch.isEmpty()) return;
+
         try {
             userChatJdbcRepository.batchUpdateLastRead(batch);
 
@@ -108,20 +118,28 @@ public class RedisSchedulerService {
             // Dirty Set은 pop() 시점에 이미 제거됨
             String[] keysToRemoveFromCache = batch.stream()
                     .map(UserChatJdbcRepository.UserChatUpdate::getDirtyKey)
+                    .filter(Objects::nonNull) // List.of 내부 null 유입으로 인한 NPE 방지
                     .toArray(String[]::new);
-
-            redisTemplateForLong.delete(List.of(keysToRemoveFromCache));
-
-            log.info("Batch of {} keys synced to DB.", batch.size());
-
+            if (keysToRemoveFromCache.length > 0) {
+                // List.of는 요소 중 null이 있으면 무조건 터지므로 Arrays.asList로 안전하게 감싸서 전송
+                redisTemplateForLong.delete(Arrays.asList(keysToRemoveFromCache));
+            }
         } catch (Exception e) {
             log.error("Batch DB update failed, will retry next schedule.", e);
 
             // 실패 시 Dirty Set 유지 → 다음 스케줄러에서 재시도
             String[] keysToReAdd = batch.stream()
                     .map(UserChatJdbcRepository.UserChatUpdate::getDirtyKey)
+                    .filter(Objects::nonNull) // List.of 내부 null 유입으로 인한 NPE 방지
                     .toArray(String[]::new);
-            redisTemplateForString.opsForSet().add(DIRTY_SET_KEY, keysToReAdd);
+
+            if (keysToReAdd.length > 0) {
+                try {
+                    redisTemplateForString.opsForSet().add(DIRTY_SET_KEY, keysToReAdd);
+                } catch (Exception redisEx) {
+                    log.error("[CRITICAL] 롤백용 Dirty 키 복구 실패. 데이터 유실 위험 지역.", redisEx);
+                }
+            }
 
             // 만약 정합성이 정말 중요한 부분이면
             // 카프카로 실패 이벤트 발행 * 2,3번 -> 이래도 실패? -> 로그 찍어서 손수 해결
