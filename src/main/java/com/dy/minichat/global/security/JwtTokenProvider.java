@@ -25,6 +25,7 @@ public class JwtTokenProvider {
         byte[] keyBytes = Decoders.BASE64.decode(secretKey);
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
+
     /**
      * 사용자 ID를 기반으로 Access Token 생성
      */
@@ -54,7 +55,6 @@ public class JwtTokenProvider {
                 .signWith(key)
                 .compact();
     }
-
 
     /**
      * 토큰 유효성 검증
