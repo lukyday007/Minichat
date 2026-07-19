@@ -28,14 +28,14 @@ public class RateLimitAspect {
 
     @Qualifier("redisTemplateForString")
     private final RedisTemplate<String, String> redisTemplateForString;
-    private final RedisScript<Long> rateLimitScript; // 2번에서 등록한 Bean
-    private final UserBanService userBanService;     // 3번에서 생성한 Bean
+    private final RedisScript<Long> rateLimitScript;
+    private final UserBanService userBanService;
 
     private static final String RATE_LIMIT_KEY_PREFIX = "rate_limit:user:";
     private static final long WINDOW_SIZE_MS = 60000; // 1분 (60,000 ms)
     private static final long MESSAGE_LIMIT = 100;    // 분당 100회
 
-    /**
+    /*
      * Pointcut: WebSocketHandler의 handleTextMessage 메서드를 대상
      */
     @Pointcut("execution(* com.dy.minichat.global.infra.websocket.WebSocketHandler.handleTextMessage(..))")

@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -47,6 +48,9 @@ public class ChatService {
     @Qualifier("redisTemplateForString")
     private final RedisTemplate<String, String> redisTemplateForString;
     private final String serverIdentifier;
+
+    private static final Duration USER_STATE_TTL = Duration.ofHours(24);
+    private static final Duration CHAT_MEMBERS_TTL = Duration.ofHours(24);
 
     /*
         // K: userId, V: 현재 입장해 있는 roomId
@@ -189,6 +193,7 @@ public class ChatService {
         // 새로운 방 입장 처리
         String newChatKey = "chatId:" + chatId + ":userId";
         redisTemplateForString.opsForSet().add(newChatKey, userIdStr);
+        redisTemplateForString.expire(newChatKey, CHAT_MEMBERS_TTL);
 
         // 분산 환경 인프라 식별자(serverIdentifier) 누락 대비 보호
         String activeServerId = (serverIdentifier != null) ? serverIdentifier : "UNKNOWN_SERVER";
@@ -200,11 +205,8 @@ public class ChatService {
                 "lastActive", LocalDateTime.now().toString()
         );
         redisTemplateForString.opsForHash().putAll(userKey, userState);
+        redisTemplateForString.expire(userKey, USER_STATE_TTL);
         log.info("[입장] user : {} -> chat : {} 상태 저장 완료 (Server: {})", userId, chatId, activeServerId);
-
-        /*
-            나중에 redis TTL 설정하기!
-        */
     }
 
     // == 채팅방 목록 반환 API == //

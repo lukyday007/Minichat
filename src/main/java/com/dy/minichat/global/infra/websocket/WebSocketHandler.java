@@ -24,6 +24,7 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.time.Duration;
 import java.util.concurrent.Executor;
 import java.io.IOException;
 import java.time.Instant;
@@ -48,6 +49,8 @@ public class WebSocketHandler extends TextWebSocketHandler {
 
     private final String serverIdentifier; // ServerConfig에서 생성된 Bean
     private static final String USER_SERVER_KEY_PREFIX = "ws:user:server:";
+    private static final Duration USER_SERVER_TTL = Duration.ofHours(24);
+    private static final Duration USER_STATE_TTL = Duration.ofHours(24);
 
     private final ChatMessageProducer chatMessageProducer;
 
@@ -91,6 +94,9 @@ public class WebSocketHandler extends TextWebSocketHandler {
                 // redis - user : server
                 String redisKey = USER_SERVER_KEY_PREFIX + userId;
                 redisTemplateForString.opsForValue().set(redisKey, serverIdentifier);
+
+                // 재연결 시 상태 키 TTL 갱신
+                redisTemplateForString.expire(userKey, USER_STATE_TTL);
 
                 log.info("유저 {} → 서버 [{}] 등록 완료", userId, serverIdentifier);
                 log.info("유저 {}가 채팅방 {}에 연결됨, server log = {}", userId, chatIdStr, serverIdentifier);

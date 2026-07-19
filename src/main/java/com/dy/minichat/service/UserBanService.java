@@ -9,6 +9,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -17,6 +18,8 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class UserBanService { // UserBanServiceCGlibProxy...
     private final UserRepository userRepository;
+
+    private static final Duration STRIKE_WINDOW = Duration.ofDays(30);
 
     @Qualifier("redisTemplateForString")
     private final RedisTemplate<String, String> redisTemplateForString;
@@ -49,16 +52,19 @@ public class UserBanService { // UserBanServiceCGlibProxy...
             return;
         }
 
-            if (strikeCount == 1) {
+        if (strikeCount == 1) {
+            // 첫 위반 시점부터 30일간 카운트 유지 (이후 자동 초기화)
+            redisTemplateForString.expire(strikeKey, STRIKE_WINDOW);
+
             // [Strike 1] 1일 밴 적용
             log.warn("!!! [Strike 1] 사용자 {} 밴 처리 (1일)", userId);
-            // "SET ban:state:user:123 "STRIKE_1" EX 86400"
+            // SET ban:state:user:123 - STRIKE_1 - EX 86400
             redisTemplateForString.opsForValue().set(tempBanKey, "STRIKE_1", 1, TimeUnit.DAYS);
 
         } else if (strikeCount == 2) {
             // [Strike 2] 1주일 밴 적용
             log.warn("!!! [Strike 2] 사용자 {} 밴 처리 (1주일)", userId);
-            // "SET ban:state:user:123 "STRIKE_2" EX 604800"
+            // SET ban:state:user:123 - STRIKE_2 - EX 604800
             redisTemplateForString.opsForValue().set(tempBanKey, "STRIKE_2", 7, TimeUnit.DAYS);
 
         } else {
