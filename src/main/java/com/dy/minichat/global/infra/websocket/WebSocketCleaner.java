@@ -26,12 +26,12 @@ public class WebSocketCleaner {
         // 1초에 1000개씩 끊는다.
         // 10만개의 소켓을 끊기위해서 100초 사용됨 -> graceful shutdown
 
-        log.info("Graceful Shutdown: 활성 웹소켓 세션의 순차적 종료를 시작합니다.");
+        // log.info("Graceful Shutdown: 활성 웹소켓 세션의 순차적 종료를 시작합니다.");
         List<WebSocketSession> sessionsToClose = new ArrayList<>(sessionManager.getSessions().values());
         int totalCnt = sessionsToClose.size();
 
         if (totalCnt == 0) {
-            log.info("종료할 활성 웹소켓 세션이 없습니다.");
+            // log.info("종료할 활성 웹소켓 세션이 없습니다.");
             return;
         }
 
@@ -50,7 +50,7 @@ public class WebSocketCleaner {
             }
 
             if (closedCnt > 0 && closedCnt % batchSize == 0 && closedCnt < totalCnt) {
-                log.info("{} / {} 개의 세션 종료 완료. 다음 배치를 위해 1초 대기합니다.", closedCnt, totalCnt);
+                // log.info("{} / {} 개의 세션 종료 완료. 다음 배치를 위해 1초 대기합니다.", closedCnt, totalCnt);
                 try {
                     Thread.sleep(1000);
 

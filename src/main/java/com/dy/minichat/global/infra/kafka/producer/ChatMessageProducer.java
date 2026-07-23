@@ -19,7 +19,7 @@ public class ChatMessageProducer {
             // TalkMessageDTO의 chatId를 Key로 사용 (순서 보장)
             String key = String.valueOf(event.getTalkMessage().getChatId());
             kafkaTemplate.send(TOPIC, key, event);
-            log.info("[Kafka] Chat message produced. Key: {}", key);
+            // log.info("[Kafka] Chat message produced. Key: {}", key);
         } catch (Exception e) {
             log.error("[Kafka] Produce 실패: {}", event.getTalkMessage().getContent(), e);
         }

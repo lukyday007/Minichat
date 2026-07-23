@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
@@ -63,6 +64,8 @@ public class WebSocketHandler extends TextWebSocketHandler {
     */
     private final WebSocketSessionManager sessionManager;
 
+    @Value("${relay.mode:bulk}")
+    private String relayMode;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
@@ -98,8 +101,8 @@ public class WebSocketHandler extends TextWebSocketHandler {
                 // 재연결 시 상태 키 TTL 갱신
                 redisTemplateForString.expire(userKey, USER_STATE_TTL);
 
-                log.info("유저 {} → 서버 [{}] 등록 완료", userId, serverIdentifier);
-                log.info("유저 {}가 채팅방 {}에 연결됨, server log = {}", userId, chatIdStr, serverIdentifier);
+                // log.info("유저 {} → 서버 [{}] 등록 완료", userId, serverIdentifier);
+                // log.info("유저 {}가 채팅방 {}에 연결됨, server log = {}", userId, chatIdStr, serverIdentifier);
             } else {
                 log.warn("유저 {}의 chatId 정보가 없음 — API 미호출 가능성 있음", userId);
             }
@@ -158,7 +161,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
                         .build();
                 chatMessageProducer.send(event);
 
-                log.info("[메시지] 보낸사람: {}, 채팅방: {}, 내용: {}", senderId, chatId, talkMessageDTO.getContent());
+                // log.info("[메시지] 보낸사람: {}, 채팅방: {}, 내용: {}", senderId, chatId, talkMessageDTO.getContent());
                 break;
 
             // 향후 다른 실시간 메시지 타입(예: READ_ACK)이 추가.
@@ -171,7 +174,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
 
     // [신규 추가] Kafka Consumer가 호출할 public 메서드 -> private sendMessageToChatRoom
     public void broadcastMessage(TalkMessageDTO message) {
-        log.info("[Kafka Consume] Broadcast 시작. ChatId: {}, Sender: {}", message.getChatId(), message.getSenderId());
+        // log.info("[Kafka Consume] Broadcast 시작. ChatId: {}, Sender: {}", message.getChatId(), message.getSenderId());
         sendMessageToChatRoom(message);
     }
 
@@ -235,8 +238,10 @@ public class WebSocketHandler extends TextWebSocketHandler {
 
                 if (session != null && session.isOpen()) {
                     try {
-                        session.sendMessage(textMessage);
-                        log.info("로컬 메시지 전송 성공. 수신자: {}", userId);
+                        synchronized (session) {
+                            session.sendMessage(textMessage);
+                        }
+                        // log.info("로컬 메시지 전송 성공. 수신자: {}", userId);
 
                     } catch (IOException e) {
                         log.error("메시지 전송 실패. 수신자: {}", userId, e);
@@ -280,47 +285,39 @@ public class WebSocketHandler extends TextWebSocketHandler {
             }
         }
 
-        // Phase 5: 서버별 벌크 gRPC 릴레이
+        // Phase 5: 서버별 gRPC 릴레이 (relay.mode 로 단건/벌크 전환)
+        boolean singleMode = "single".equalsIgnoreCase(relayMode);
         serverToRecipients.forEach((targetServerId, recipientIds) -> {
-            executor.execute(() -> {
-                log.info("벌크 릴레이 시도. 대상 서버 {}", targetServerId);
-                relayBulkMessageViaGrpc(
-                        targetServerId,
-                        message,
-                        recipientIds
+            if (singleMode) {
+                // 단건: 수신자 1명당 gRPC 호출 1회 (N calls)
+                for (Long recipientId : recipientIds) {
+                    executor.execute(() ->
+                            relaySingleMessageViaGrpc(targetServerId, message, recipientId)
+                    );
+                }
+            } else {
+                // 벌크: 대상 서버 1대당 gRPC 호출 1회 (K calls)
+                executor.execute(() ->
+                        relayBulkMessageViaGrpc(targetServerId, message, recipientIds)
                 );
-            });
+            }
         });
 
-        // Phase 6: 오프라인 유저 — 배치 저장 + FCM
+        // Phase 6: 오프라인 유저 — FCM
         if (!offlineUserIds.isEmpty()) {
-            saveOfflineMessages(offlineUserIds, message, chatId);
+            saveOfflineMessages(offlineUserIds, message);
         }
     }
 
 
-    // Phase 6 세부: 오프라인 유저 미전달 메시지 배치 저장 + FCM 발송
-    private void saveOfflineMessages(List<Long> offlineUserIds, TalkMessageDTO message, Long chatId) {
-        List<UndeliveredMessage> undeliveredMessages = offlineUserIds.stream()
-                .map(userId -> UndeliveredMessage.builder()
-                        .id(undeliveredMessageIdGenerator.generate())
-                        .chatId(chatId)
-                        .senderId(message.getSenderId())
-                        .receiverId(userId)
-                        .content(message.getContent())
-                        .build())
-                .toList();
-
-        undeliveredMessageRepository.saveAll(undeliveredMessages);
-        log.info("오프라인 메시지 배치 저장 완료. {}건", undeliveredMessages.size());
-
+    // Phase 6 세부: 오프라인 유저 미전달 시 FCM 발송
+    private void saveOfflineMessages(List<Long> offlineUserIds, TalkMessageDTO message) {
         offlineUserIds.forEach(userId ->
                 fcmPushService.sendPushNotification(userId, message));
     }
 
-
     /*
-     * [신규] 벌크 gRPC 릴레이를 위한 헬퍼 메서드
+     * 벌크 gRPC 릴레이를 위한 헬퍼 메서드
      */
     private void relayBulkMessageViaGrpc(String targetServerId, TalkMessageDTO messageDTO, List<Long> recipientIds) {
         Map<String, String> addresses = grpcServerProperties.getAddresses();
@@ -345,12 +342,35 @@ public class WebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+    /*
+     * 싱글 gRPC 릴레이를 위한 헬퍼 메서드
+     */
+    private void relaySingleMessageViaGrpc(String targetServerId, TalkMessageDTO messageDTO, Long recipientId) {
+        String targetAddress = grpcServerProperties.getAddresses().get(targetServerId);
+
+        if (targetAddress == null || targetAddress.isEmpty()) {
+            log.error("gRPC 단건 릴레이 실패: 대상 서버 '{}'의 주소를 찾을 수 없습니다.", targetServerId);
+            return;
+        }
+
+        try {
+            String[] parts = targetAddress.split(":");
+            messageRelayClient.relayMessageToServer(
+                    parts[0], Integer.parseInt(parts[1]), messageDTO, recipientId);
+
+        } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
+            log.error("gRPC 단건 릴레이 실패: 주소 형식 오류. 서버: '{}', 주소: {}", targetServerId, targetAddress, e);
+        } catch (Exception e) {
+            log.error("gRPC 단건 릴레이 중 예상치 못한 에러. 서버: {}, 수신자: {}", targetServerId, recipientId, e);
+        }
+    }
+
 
     @Override
     public void afterConnectionClosed (WebSocketSession session, CloseStatus status) throws Exception {
         Optional<Long> userIdOptional = getUserIdFromSession(session);
         if (userIdOptional.isEmpty()) {
-            log.info("[연결 종료] 연결이 끊겼습니다. 상태: {}", status);
+            log.warn("[연결 종료] 연결이 끊겼습니다. 상태: {}", status);
             return;
         }
 
@@ -370,12 +390,12 @@ public class WebSocketHandler extends TextWebSocketHandler {
         // 메모리/Redis 정리
         sessionManager.removeSession(userId);
         redisTemplateForString.delete(USER_SERVER_KEY_PREFIX + userId);
-        log.info("유저 {}의 연결 종료, 서버 [{}]에서 정리 완료", userId, serverIdentifier);
+        // log.info("유저 {}의 연결 종료, 서버 [{}]에서 정리 완료", userId, serverIdentifier);
 
         // redisTemplate.delete(userKey);
         redisTemplateForString.opsForHash().delete(userKey, "serverId", "lastActive");
-        log.info("[연결 종료] Redis 사용자 접속 상태(서버)만 삭제. Key: {}", userKey);
-        log.info("[연결 종료] Redis 사용자 위치 정보 삭제. Key: {}", userKey);
+        // log.info("[연결 종료] Redis 사용자 접속 상태(서버)만 삭제. Key: {}", userKey);
+        // log.info("[연결 종료] Redis 사용자 위치 정보 삭제. Key: {}", userKey);
     }
 
 
@@ -403,6 +423,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
             return Optional.empty(); // 예외 발생 시에도 안전하게 빈 Optional 반환
         }
     }
+
 
     private Optional<Long> getCurrentChatIdForUser(Long userId) {
         try {

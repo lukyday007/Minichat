@@ -15,6 +15,6 @@ public class UserChatUpdateProducer {
 
     public void sendUserChatUpdateEvent(UserChatUpdatePayload event) {
         kafkaTemplate.send(TOPIC, event);
-        log.info("[Kafka] UserChatUpdateEvent produced. ChatId={}", event.getChatId());
+        // log.info("[Kafka] UserChatUpdateEvent produced. ChatId={}", event.getChatId());
     }
 }
