@@ -19,13 +19,13 @@ const WS_PATH = '/ws/minichat';
 const SIGNUP_PATH = '/minichat/user/auth/signup';
 const LOGIN_PATH = '/minichat/user/auth/login';
 
-const ROOM_COUNT = 5;
+const ROOM_COUNT = 15;
 const USERS_PER_ROOM = 4;
 const TOTAL_USERS = ROOM_COUNT * USERS_PER_ROOM; // 20
 
 // 각 유저가 보낼 TALK 메시지 수 / 전송 간격(ms)
-const TALK_PER_USER = 3;
-const TALK_INTERVAL_MS = 1000;
+const TALK_PER_USER = 20;
+const TALK_INTERVAL_MS = 200;
 
 // WebSocket 연결 유지 시간(ms) — 전파 대기 포함
 const WS_HOLD_MS = 15000;
