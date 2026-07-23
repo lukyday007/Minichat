@@ -35,11 +35,11 @@ public class WebSocketHandshakeInterceptor implements HandshakeInterceptor {
 
         // 1. URI에서 'token' 쿼리 파라미터 추출
         String token = extractTokenFromUri(request.getURI());
-        log.info("[Handshake] raw token from URI: '{}'", token);
+        // log.info("[Handshake] raw token from URI: '{}'", token);
 
         if (!StringUtils.hasText(token)) {
             token = extractTokenFromHeader(request.getHeaders());
-            log.info("[Handshake] raw token from Header: '{}'", token);
+            // log.info("[Handshake] raw token from Header: '{}'", token);
         }
 
         // 2. 토큰 유효성 검사
@@ -57,7 +57,7 @@ public class WebSocketHandshakeInterceptor implements HandshakeInterceptor {
             // -> 이 userId를 RateLimitAspect가 사용하게 됩니다.
             attributes.put("userId", userId);
 
-            log.info("[Handshake] 인증 성공. userId: {}", userId);
+            // log.info("[Handshake] 인증 성공. userId: {}", userId);
             return true; // 핸드셰이크 승인
         }
 

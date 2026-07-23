@@ -1,0 +1,266 @@
+{
+    "root_group": {
+        "checks": {},
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {}
+    },
+    "metrics": {
+        "vus": {
+            "value": 30,
+            "min": 0,
+            "max": 30
+        },
+        "http_req_sending": {
+            "med": 0.009,
+            "max": 0.199,
+            "p(90)": 0.014,
+            "p(95)": 0.019999999999999983,
+            "avg": 0.012340659340659338,
+            "min": 0.005
+        },
+        "http_req_waiting": {
+            "p(95)": 85.14449999999998,
+            "avg": 52.268571428571406,
+            "min": 2.962,
+            "med": 71.161,
+            "max": 127.047,
+            "p(90)": 79.948
+        },
+        "data_sent": {
+            "rate": 1693.861603932232,
+            "count": 363830
+        },
+        "http_req_tls_handshaking": {
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "ws_connecting": {
+            "p(90)": 51.9861708,
+            "p(95)": 52.0358936,
+            "avg": 38.6031014,
+            "min": 12.922292,
+            "med": 47.361000000000004,
+            "max": 52.089917
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 91,
+            "value": 0
+        },
+        "ws_delivery_latency_ms": {
+            "med": 60,
+            "max": 422,
+            "p(90)": 91,
+            "p(95)": 105,
+            "avg": 63.98197945845005,
+            "min": 10,
+            "thresholds": {
+                "p(95)<500": false
+            }
+        },
+        "http_req_receiving": {
+            "avg": 0.192989010989011,
+            "min": 0.084,
+            "med": 0.185,
+            "max": 0.609,
+            "p(90)": 0.259,
+            "p(95)": 0.2894999999999999
+        },
+        "app_msgs_received": {
+            "count": 107100,
+            "rate": 498.6190742411072
+        },
+        "http_req_connecting": {
+            "avg": 0.0016483516483516484,
+            "min": 0,
+            "med": 0,
+            "max": 0.15,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "ws_msgs_received": {
+            "rate": 498.6190742411072,
+            "count": 107100
+        },
+        "http_reqs": {
+            "rate": 0.4236632656950584,
+            "count": 91
+        },
+        "http_req_blocked": {
+            "avg": 0.008736263736263739,
+            "min": 0.001,
+            "med": 0.002,
+            "max": 0.617,
+            "p(90)": 0.003,
+            "p(95)": 0.003
+        },
+        "vus_max": {
+            "value": 30,
+            "min": 30,
+            "max": 30
+        },
+        "app_msgs_sent": {
+            "count": 3570,
+            "rate": 16.62063580803691
+        },
+        "http_req_duration": {
+            "p(95)": 85.35299999999998,
+            "avg": 52.47390109890114,
+            "min": 3.051,
+            "med": 71.37,
+            "max": 127.249,
+            "p(90)": 80.136
+        },
+        "data_received": {
+            "count": 17632294,
+            "rate": 82089.61821687236
+        },
+        "ws_sessions": {
+            "count": 30,
+            "rate": 0.1396692084708984
+        },
+        "ws_msgs_sent": {
+            "count": 3570,
+            "rate": 16.62063580803691
+        },
+        "http_req_duration{expected_response:true}": {
+            "med": 71.37,
+            "max": 127.249,
+            "p(90)": 80.136,
+            "p(95)": 85.35299999999998,
+            "avg": 52.47390109890114,
+            "min": 3.051
+        }
+    },
+    "setup_data": {
+        "chatId": "205928918438383616",
+        "users": [
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg4OTk0NjMzNTIzMjAiLCJpYXQiOjE3ODQ3ODY4NzUsImV4cCI6MTc4NDc5MDQ3NX0.rGoJlGqV-HP2yrNfCWf4__SavA95-cBAixfY38oosw-Za3zEwYmIGi5A5Kn7r9RwKZt7Mh2Vi8ccx2obHsZ6eA",
+                "userId": "205928899463352320"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MDAwOTI0OTc5MjAiLCJpYXQiOjE3ODQ3ODY4NzUsImV4cCI6MTc4NDc5MDQ3NX0.U3UT4lsD97pVxoNHNLNocws0ZpsioANuOoc253IPD_drYQ5nqLnr5biZ0QueEBN77tFRhwHQxKHxZhfvnC0ovQ",
+                "userId": "205928900092497920"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MDA3MDkwNjA2MDgiLCJpYXQiOjE3ODQ3ODY4NzUsImV4cCI6MTc4NDc5MDQ3NX0.E6GWgwRto4GYAdAj7G-d6qxkyh9N9mIQmYFmA1eP6eNK1jA4Ht_1fnVNYF2duWHsy3HVNLno_K-CBCP2C5ooig",
+                "userId": "205928900709060608"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MDEzMzQwMTE5MDQiLCJpYXQiOjE3ODQ3ODY4NzYsImV4cCI6MTc4NDc5MDQ3Nn0.ee7sUnyvs0D7Uv315vh57bBFylhvHKB_XFYfppJaLwAyoB_wUzT9AhYRnDsQAWl9eJ3vZQnYWr3wlgp4Ts03Pg",
+                "userId": "205928901334011904"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MDE5NDIxODU5ODQiLCJpYXQiOjE3ODQ3ODY4NzYsImV4cCI6MTc4NDc5MDQ3Nn0.40Wg9Ts3nHmg_438CYGOjFndvjqEG2K6Ckx6gHLwIsjnobN6dqVmKfkuA9wv7yHdFOHDPBGqpIyqrUXkogr0Sg",
+                "userId": "205928901942185984"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MDI1NDYxNjU3NjAiLCJpYXQiOjE3ODQ3ODY4NzYsImV4cCI6MTc4NDc5MDQ3Nn0.8mVoEQmCRT3ruBU7g9RGl2947_Ri-k1KNry53ab5tfwuqmH4HGMmtqFfzE56Y0oahBJ26aZN091bN8oNUym_8A",
+                "userId": "205928902546165760"
+            },
+            {
+                "userId": "205928903154339840",
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MDMxNTQzMzk4NDAiLCJpYXQiOjE3ODQ3ODY4NzYsImV4cCI6MTc4NDc5MDQ3Nn0.nWMPRfPj0T2FQIlHDnqz3HLxHVy-dhKA4tkgpbCpu02WI5hYmnRhR_kc19v2Sv4KGxDu-2GB_SxarjJHjjL_fA"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MDM3NzUwOTY4MzIiLCJpYXQiOjE3ODQ3ODY4NzYsImV4cCI6MTc4NDc5MDQ3Nn0.3tNUkAAKHFFkKvYQrtleT0P2eUslcCiSINz_eMMtXCKoWhZbtPh0RUxYR3t6K9gEgmfRPXyA3Bbx6JddPNPpzA",
+                "userId": "205928903775096832"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MDQzOTE2NTk1MjAiLCJpYXQiOjE3ODQ3ODY4NzYsImV4cCI6MTc4NDc5MDQ3Nn0.vR9n8rf8Z0KSXHpx_WqG0tcZO1nu5fL2Vvn43fPJ-TUJe_JR9_oH8hi9OzIJ-iPKKo9QfRzPaDvdSU6cqSA7vg",
+                "userId": "205928904391659520"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MDQ5OTk4MzM2MDAiLCJpYXQiOjE3ODQ3ODY4NzcsImV4cCI6MTc4NDc5MDQ3N30.lEkisUWx8gbJE4w0s2oagPQjjFA8rGkVtHPVa4-ZZzr6AbW-9-wDtHmCVBHrW-K6HLs98fKx5muz2_1GTnR-Lw",
+                "userId": "205928904999833600"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MDU2MDgwMDc2ODAiLCJpYXQiOjE3ODQ3ODY4NzcsImV4cCI6MTc4NDc5MDQ3N30.i7JdNllVHm6ZNQxaU4Z1meTsQTPdzxdYbhHTzcrwG2-pnJyTyMBKMtGaqh2s6R6CzjljWs7qBpiVmpkaaVP9gw",
+                "userId": "205928905608007680"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MDYyMjAzNzYwNjQiLCJpYXQiOjE3ODQ3ODY4NzcsImV4cCI6MTc4NDc5MDQ3N30.no5Hc87mDPmByfwMPwxP6FnGJIiRG3TEY1cPndeINCkIfIJL_rtUSZYO-7X8uBNTFPn0pBAA8QrXRyMvzAPQ_w",
+                "userId": "205928906220376064"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MDY4MzI3NDQ0NDgiLCJpYXQiOjE3ODQ3ODY4NzcsImV4cCI6MTc4NDc5MDQ3N30.q0YjVuDHRVkoXRUE0EsXqqXIvs6pFyqIV-x3i2JmJE7shQqTlvegVXvrAmBBsfSHlva1sz4WsLaK4ALePdE1nw",
+                "userId": "205928906832744448"
+            },
+            {
+                "userId": "205928907445112832",
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MDc0NDUxMTI4MzIiLCJpYXQiOjE3ODQ3ODY4NzcsImV4cCI6MTc4NDc5MDQ3N30.iOnrPTc7Jy55Lr4fUan4YWU6kUJYW0puWGCV1XBGNiqJvL9KlvVwtzhJJ1IgSP2D6GhSF_oI8oulEmWqyoj3sw"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MDgwNTMyODY5MTIiLCJpYXQiOjE3ODQ3ODY4NzcsImV4cCI6MTc4NDc5MDQ3N30.YLc-k9G0PYMaltQy98GAowrVNsINfDjwR9A7ZenI60yTLMp6NeSufsuP-ynWGK7xrer3zDDtYSxz1zyAWtr0Qg",
+                "userId": "205928908053286912"
+            },
+            {
+                "userId": "205928908657266688",
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MDg2NTcyNjY2ODgiLCJpYXQiOjE3ODQ3ODY4NzcsImV4cCI6MTc4NDc5MDQ3N30.2g_o_peo7yErq3IYexTiEvdqJtfCqMqflJHiAG09ABaJEtpmbcXcolltwZffO31GgtKxpKy1BDEK3xL-4LR4OQ"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MDkyNjEyNDY0NjQiLCJpYXQiOjE3ODQ3ODY4NzgsImV4cCI6MTc4NDc5MDQ3OH0.bQJZKSROOFX_bDpJ_m3NCByUdjt1BJ5NgcVVvs_5mcjw1LKjf6UO4fRot_CjGOFyo8gC7IA5c5oziTbp_ntaiA",
+                "userId": "205928909261246464"
+            },
+            {
+                "userId": "205928910091718656",
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MTAwOTE3MTg2NTYiLCJpYXQiOjE3ODQ3ODY4NzgsImV4cCI6MTc4NDc5MDQ3OH0.wIwaKaPBeksy7a3zTjdeKP0oGCwUBa9uOZga98oSeTz4ijPy36ScvE6G_pAecgJ-sI2CPiX0oPrdwqxdeHjV4g"
+            },
+            {
+                "userId": "205928910750224384",
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MTA3NTAyMjQzODQiLCJpYXQiOjE3ODQ3ODY4NzgsImV4cCI6MTc4NDc5MDQ3OH0.3_gKgqwygWrZLS1T4xH3j0neE7QPTwC3CYw7SRYB6E89iFTMcFkVhbsw-KkBs3JmLF-9ViE4BH6hshzBEMnMEw"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MTEzODM1NjQyODgiLCJpYXQiOjE3ODQ3ODY4NzgsImV4cCI6MTc4NDc5MDQ3OH0.maEFJwzFqmSQJSfnNS8sQ9j4hZvdh1eEFE8gFCng3feeJ36lQyN7DUw4k2z-hztLMwTSdpSPzulmw4pzZQxHPg",
+                "userId": "205928911383564288"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MTIxMDA3OTAyNzIiLCJpYXQiOjE3ODQ3ODY4NzgsImV4cCI6MTc4NDc5MDQ3OH0.yjupJdo25WfjatTJBZrw_n0Z464iHI74kj6VjhEMxoVuFXwIfWu__qREo3LhVQGlcrBxPkIQvmZbigD7vkmaow",
+                "userId": "205928912100790272"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MTI5MjcwNjgxNjAiLCJpYXQiOjE3ODQ3ODY4NzgsImV4cCI6MTc4NDc5MDQ3OH0.GpGxTcUXJ62KMb6h_0dflYWnG6aLdoc6GnZB8L47prqdMPzD1OypRABFA95SYVhGngYwQRUKZ3P5ZgcT-5MISw",
+                "userId": "205928912927068160"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MTM2NDAwOTk4NDAiLCJpYXQiOjE3ODQ3ODY4NzksImV4cCI6MTc4NDc5MDQ3OX0.wYIaM3m-XlZEnfZeHCRxGrVZ4N-DE0mDFrS5Iptj9dwjxFXb2WfGovs-GZvzRMbV_yFPOYuOs9wUXJnGH9S5bw",
+                "userId": "205928913640099840"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MTQyNjA4NTY4MzIiLCJpYXQiOjE3ODQ3ODY4NzksImV4cCI6MTc4NDc5MDQ3OX0.OnMWVrQ6E-u5IqdBuTxiYflZtfxjQjgaLXbMIbwordbPdaSunTpek3XjePylMaVK0DL-U-KT6lXqv4eylhX3aA",
+                "userId": "205928914260856832"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MTQ4OTAwMDI0MzIiLCJpYXQiOjE3ODQ3ODY4NzksImV4cCI6MTc4NDc5MDQ3OX0.QHwz5G8XL0PugSDvt3NUb1mHpZKgElzWrz1dEbvBofqBrPBS2D7XVZ2fyjxq2aEFZGXwlAW0ydm9aiKMJSWTIw",
+                "userId": "205928914890002432"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MTU1MTkxNDgwMzIiLCJpYXQiOjE3ODQ3ODY4NzksImV4cCI6MTc4NDc5MDQ3OX0.uk06DYAZ1lWvZXL2oLHsOtFeG9MoUnIKfcfcJsIqG2EQqMfKmttcDDRnGgQCf8tuSxpxgejRRXgi36i0F5dToA",
+                "userId": "205928915519148032"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MTYxMzU3MTA3MjAiLCJpYXQiOjE3ODQ3ODY4NzksImV4cCI6MTc4NDc5MDQ3OX0.vCjkcH3OrDyLiTNq7OSPMTBWulyLPiv_sim3CpSLc1bGbjLKXZ_O0IGjOtCpylrM0nKzCO-C22exYzwcgPvWHQ",
+                "userId": "205928916135710720"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MTY3NzMyNDQ5MjgiLCJpYXQiOjE3ODQ3ODY4NzksImV4cCI6MTc4NDc5MDQ3OX0.HGIL11mR-hI43LhpEutgGOXO6wVcAkMrkOWmjuoUayXFwAt_JrwT2kZY_C9qNjkys8mKttBhVanxnMWH1X_7gA",
+                "userId": "205928916773244928"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MTc0NDQzMzM1NjgiLCJpYXQiOjE3ODQ3ODY4NzksImV4cCI6MTc4NDc5MDQ3OX0.Km0HhmiKC4Muh0yWjDoXuCwhI-eEmBUSDcKbj-6DZVENFgZ3wBpHxhWnudDGe3Auu6BT8Wcu8UmMXxGlpsk-kA",
+                "userId": "205928917444333568"
+            },
+            {
+                "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMDU5Mjg5MTgwODE4Njc3NzYiLCJpYXQiOjE3ODQ3ODY4ODAsImV4cCI6MTc4NDc5MDQ4MH0.IFf8s2rYi9_nESEUw0GbaIuB1aawKVVa6m1pLYZ5XLPBlXduwB7vK5mX_eZ1gqaME6dzF36uWUh_dDil2eo63Q",
+                "userId": "205928918081867776"
+            }
+        ]
+    }
+}

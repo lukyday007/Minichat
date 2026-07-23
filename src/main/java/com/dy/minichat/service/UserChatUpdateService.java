@@ -85,6 +85,6 @@ public class UserChatUpdateService {
                 event.getLastMessageId(),
                 event.getTimestamp()
         );
-        log.info("[Kafka] UserChatUpdateEvent consumed. ChatId={}, Updated={}", event.getChatId(), userChatIds.size());
+        // log.info("[Kafka] UserChatUpdateEvent consumed. ChatId={}, Updated={}", event.getChatId(), userChatIds.size());
     }
 }

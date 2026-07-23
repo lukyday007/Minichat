@@ -13,7 +13,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 public class ThreadPoolConfig {
 
     @Bean(name = "customThreadPool")
-    public Executor customThreadPool() {
+    public ThreadPoolTaskExecutor customThreadPool() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(30);
         executor.setMaxPoolSize(200);

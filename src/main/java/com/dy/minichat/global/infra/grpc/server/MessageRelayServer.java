@@ -1,6 +1,7 @@
 package com.dy.minichat.global.infra.grpc.server;
 
 import com.dy.grpc.proto.RelayBulkMessageRequest;
+import com.dy.grpc.proto.RelayMessageRequest;
 import com.dy.grpc.proto.RelayMessageResponse;
 import com.dy.grpc.proto.RelayMessageServiceGrpc;
 import com.dy.minichat.global.infra.websocket.WebSocketSessionManager;
@@ -26,18 +27,66 @@ public class MessageRelayServer extends RelayMessageServiceGrpc.RelayMessageServ
     private final WebSocketSessionManager sessionManager;
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
-    /**
-     * [신규] 벌크 릴레이 RPC 구현
-     */
+
+    // single relay
+    @Override
+    public void relayMessage(RelayMessageRequest request,
+                             StreamObserver<RelayMessageResponse> responseObserver) {
+        String messagePayload;
+        try {
+            messagePayload = buildMessagePayload(
+                    request.getMessageType(), request.getSenderId(),
+                    request.getChatId(), request.getContent(), request.getTimestamp());
+        } catch (JsonProcessingException e) {
+            log.error("단건 릴레이 메시지 직렬화 실패", e);
+            responseObserver.onError(e);
+            return;
+        }
+
+        TextMessage textMessage = new TextMessage(messagePayload);
+        Long recipientId = request.getRecipientId();
+        boolean delivered = false;
+
+        WebSocketSession session = sessionManager.getSession(recipientId);
+        if (session != null && session.isOpen()) {
+            try {
+                synchronized (session) {
+                    session.sendMessage(textMessage);
+                }
+                delivered = true;
+                log.debug("gRPC -> WebSocket 단건 릴레이 성공. 수신자 ID: {}", recipientId);
+            } catch (IOException e) {
+                log.error("gRPC -> WebSocket 단건 전송 실패. 수신자 ID: {}", recipientId, e);
+            }
+        } else {
+            log.warn("단건 릴레이 세션 없음. 수신자 ID: {}", recipientId);
+        }
+
+        responseObserver.onNext(RelayMessageResponse.newBuilder()
+                .setSuccess(delivered)
+                .setMessage(String.format("Single relay: %d delivered, %d failed",
+                        delivered ? 1 : 0, delivered ? 0 : 1))
+                .build());
+        responseObserver.onCompleted();
+    }
+
+
+    // 벌크 릴레이 RPC 구현
     @Override
     public void relayBulkMessage(RelayBulkMessageRequest request,
                                  StreamObserver<RelayMessageResponse> responseObserver) {
-        log.info("gRPC relayBulkMessage 요청 수신: senderId: {}, 수신자 {}명",
+        log.debug("gRPC relayBulkMessage 요청 수신: senderId: {}, 수신자 {}명",
                 request.getSenderId(), request.getRecipientIdsCount());
 
         String messagePayload;
         try {
-            messagePayload = buildMessagePayload(request);
+            messagePayload = buildMessagePayload(
+                    request.getMessageType(),
+                    request.getSenderId(),
+                    request.getChatId(),
+                    request.getContent(),
+                    request.getTimestamp()
+            );
         } catch (JsonProcessingException e) {
             log.error("벌크 릴레이 메시지 직렬화 실패", e);
             responseObserver.onError(e);
@@ -53,9 +102,11 @@ public class MessageRelayServer extends RelayMessageServiceGrpc.RelayMessageServ
 
             if (session != null && session.isOpen()) {
                 try {
-                    session.sendMessage(textMessage);
+                    synchronized (session) {
+                        session.sendMessage(textMessage);
+                    }
                     deliveredCount++;
-                    log.info("gRPC -> WebSocket 벌크 릴레이 성공. 수신자 ID: {}", recipientId);
+                    log.debug("gRPC -> WebSocket 벌크 릴레이 성공. 수신자 ID: {}", recipientId);
                 } catch (IOException e) {
                     log.error("gRPC -> WebSocket 벌크 전송 실패. 수신자 ID: {}", recipientId, e);
                     failedCount++;
@@ -74,14 +125,15 @@ public class MessageRelayServer extends RelayMessageServiceGrpc.RelayMessageServ
         responseObserver.onCompleted();
     }
 
+
     // gRPC Request 객체로부터 WebSocket으로 보낼 JSON 문자열을 생성하는 헬퍼 메서드
-    private String buildMessagePayload(RelayBulkMessageRequest request) throws JsonProcessingException {
+    private String buildMessagePayload(String type, long senderId, long chatId, String content, String timestamp) throws JsonProcessingException {
         Map<String, Object> payloadMap = Map.of(
-                "type", request.getMessageType(),
-                "senderId", request.getSenderId(),
-                "chatId", request.getChatId(),
-                "content", request.getContent(),
-                "timestamp", Instant.parse(request.getTimestamp())
+                "type", type,
+                "senderId", senderId,
+                "chatId", chatId,
+                "content", content,
+                "timestamp", Instant.parse(timestamp)
         );
         return objectMapper.writeValueAsString(payloadMap);
     }
