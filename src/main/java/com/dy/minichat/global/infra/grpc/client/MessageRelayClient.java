@@ -47,12 +47,8 @@ public class MessageRelayClient {
 
         try {
             RelayMessageResponse response = stub.relayMessage(request);
-            // log.info("gRPC Relay Result: {}", response.getMessage());
-
         } catch (Exception e) {
-            // log.error("gRPC request to {} failed: {}", targetAddress, e.getMessage());
-            channels.remove(targetAddress);
-            channel.shutdown();
+            log.error("gRPC 단건 릴레이 실패. 대상: {}, 원인: {}", targetAddress, e.getMessage());
         }
     }
 
@@ -60,8 +56,7 @@ public class MessageRelayClient {
     /**
      * [추가] 벌크 릴레이 메서드
      */
-    public void relayBulkMessageToServer(String targetServerHost, int targetServerPort,
-                                         TalkMessageDTO messageDto, List<Long> recipientIds) {
+    public void relayBulkMessageToServer(String targetServerHost, int targetServerPort, TalkMessageDTO messageDto, List<Long> recipientIds) {
         String targetAddress = targetServerHost + ":" + targetServerPort;
         ManagedChannel channel = channels.computeIfAbsent(targetAddress, key ->
                 ManagedChannelBuilder.forAddress(targetServerHost, targetServerPort)
@@ -85,15 +80,13 @@ public class MessageRelayClient {
             // log.info("gRPC Bulk Relay Result: {}", response.getMessage());
 
         } catch (Exception e) {
-            log.error("gRPC Bulk Relay to {} failed: {}", targetAddress, e.getMessage());
-            channels.remove(targetAddress);
-            channel.shutdown();
+            log.error("gRPC 벌크 릴레이 실패. 대상: {}, 원인: {}", targetAddress, e.getMessage());
         }
     }
 
     @PreDestroy
     public void shutdownAllChannels() {
-        log.info("애플리케이션 종료: 모든 활성 gRPC 채널을 종료합니다...");
+        // log.info("애플리케이션 종료: 모든 활성 gRPC 채널을 종료합니다...");
         for (ManagedChannel channel : channels.values()) {
             try {
                 channel.shutdown();
@@ -101,6 +94,6 @@ public class MessageRelayClient {
                 log.error("gRPC 채널 종료 중 에러 발생", e);
             }
         }
-        log.info("모든 gRPC 채널이 종료되었습니다.");
+        // log.info("모든 gRPC 채널이 종료되었습니다.");
     }
 }
