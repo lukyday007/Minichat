@@ -47,3 +47,5 @@ Dockerfile
 src/main/resources/firebase-service-account.json
 grafana-datasource.yml
 prometheus.yml
+
+test/results/*.json
