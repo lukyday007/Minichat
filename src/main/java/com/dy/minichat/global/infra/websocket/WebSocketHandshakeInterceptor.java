@@ -35,29 +35,31 @@ public class WebSocketHandshakeInterceptor implements HandshakeInterceptor {
 
         // 1. URI에서 'token' 쿼리 파라미터 추출
         String token = extractTokenFromUri(request.getURI());
-        // log.info("[Handshake] raw token from URI: '{}'", token);
 
         if (!StringUtils.hasText(token)) {
             token = extractTokenFromHeader(request.getHeaders());
-            // log.info("[Handshake] raw token from Header: '{}'", token);
         }
 
-        // 2. 토큰 유효성 검사
+        // 2. 토큰 유효성 검사 (JWT 서명 검증 — 로컬, Redis 무관)
         if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
             // 3. 토큰에서 userId 추출
             Long userId = jwtTokenProvider.getUserIdFromToken(token);
 
-            // 4. [AOP 연동] 밴 상태 확인 (AOP보다 먼저 차단)
-            if (userBanService.isUserBanned(userId)) {
-                log.warn("[Handshake] 밴 상태인 사용자 {}의 연결 시도 차단", userId);
-                return false; // 핸드셰이크 거부
+            // 4. [부가 방어선] 밴 상태 확인 — Redis 장애 시 Fail-Open
+            //    밴 체크는 부가 방어선이므로 Redis가 죽으면 통과
+            //    (통과한 밴 유저는 RateLimitAspect에서 서킷 복구 후 재차단)
+            try {
+                if (userBanService.isUserBanned(userId)) {
+                    log.warn("[Handshake] 밴 상태인 사용자 {}의 연결 시도 차단", userId);
+                    return false; // 핸드셰이크 거부
+                }
+            } catch (Exception e) {
+                log.error("[Handshake][Fail-Open] 밴 확인 중 Redis 실패 — 연결은 허용. userId: {}", userId, e);
+                // 예외를 삼키고 아래로 진행 → 접속 허용
             }
 
             // 5. [핵심] userId를 세션 속성(attributes)에 저장
-            // -> 이 userId를 RateLimitAspect가 사용하게 됩니다.
             attributes.put("userId", userId);
-
-            // log.info("[Handshake] 인증 성공. userId: {}", userId);
             return true; // 핸드셰이크 승인
         }
 
@@ -65,6 +67,7 @@ public class WebSocketHandshakeInterceptor implements HandshakeInterceptor {
         response.setStatusCode(HttpStatus.UNAUTHORIZED);
         return false; // 핸드셰이크 거부
     }
+
 
     @Override
     public void afterHandshake(
