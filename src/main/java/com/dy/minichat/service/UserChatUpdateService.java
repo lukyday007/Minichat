@@ -59,7 +59,6 @@ public class UserChatUpdateService {
     */
 
     // 카프카 Async 둘 중 하나만 선택 -> only use kafka
-    @Transactional
     public void updateUserChatOnNewMessage(Long chatId, Message lastMessage) {
         if (chatId == null || lastMessage == null) {
             log.error("[채팅 업데이트 실패] 필수 파라미터가 누락되었습니다. chatId: {}, lastMessage: {}", chatId, lastMessage);
