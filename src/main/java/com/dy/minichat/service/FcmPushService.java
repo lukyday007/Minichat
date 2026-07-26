@@ -25,23 +25,34 @@ public class FcmPushService {
 
         if (!firebaseEnabled) return;   // 로드테스트에선 아무것도 안 함
 
-        String token = fcmTokenService.getTokenByUserId(recipientId);
+        try {
+            String token = fcmTokenService.getTokenByUserId(recipientId);
 
-        String senderName = userRepository.findById(messageDTO.getSenderId())
-                .map(User::getName) // User 객체의 getName() 메서드 사용
-                .orElse("알 수 없는 사용자");
+            // 토큰이 없는 유저는 조용히 스킵 (푸시 대상 아님)
+            if (token == null || token.isBlank()) {
+                return;
+            }
 
-        String title = senderName;
-        String body = messageDTO.getContent();
-        Map<String, String> data = Map.of(
-                "type", "NEW_MESSAGE",
-                "chatId", String.valueOf(messageDTO.getChatId()),
-                "senderId", String.valueOf(messageDTO.getSenderId()),
-                "senderName", senderName,
-                "content", messageDTO.getContent(),
-                "sentAt", messageDTO.getTimestamp().toString()
-        );
+            String senderName = userRepository.findById(messageDTO.getSenderId())
+                    .map(User::getName)
+                    .orElse("알 수 없는 사용자");
 
-        fcmClient.sendMessage(token, title, body, data);
+            String title = senderName;
+            String body = messageDTO.getContent();
+            Map<String, String> data = Map.of(
+                    "type", "NEW_MESSAGE",
+                    "chatId", String.valueOf(messageDTO.getChatId()),
+                    "senderId", String.valueOf(messageDTO.getSenderId()),
+                    "senderName", senderName,
+                    "content", messageDTO.getContent(),
+                    "sentAt", messageDTO.getTimestamp().toString()
+            );
+
+            fcmClient.sendMessage(token, title, body, data);
+
+        } catch (Exception e) {
+            // FCM 실패는 메시지 전달의 실패가 아님 — 삼키고 로깅만
+            log.warn("[FCM 발송 실패] 수신자 {} 푸시 전송 중 예외 (무시하고 계속)", recipientId, e);
+        }
     }
 }
