@@ -34,9 +34,4 @@ public class IdGeneratorConfig {
     public UserChatIdGenerator userChatIdGenerator(Snowflake snowflake) {
         return new UserChatIdGenerator(snowflake);
     }
-
-    @Bean
-    public UndeliveredMessageIdGenerator unreadMessageIdGenerator(Snowflake snowflake) {
-        return new UndeliveredMessageIdGenerator(snowflake);
-    }
 }

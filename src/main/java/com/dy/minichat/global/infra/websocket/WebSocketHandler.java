@@ -1,14 +1,11 @@
 package com.dy.minichat.global.infra.websocket;
 
-import com.dy.minichat.global.id.UndeliveredMessageIdGenerator;
 import com.dy.minichat.dto.message.TalkMessageDTO;
 import com.dy.minichat.dto.request.MessageRequestDTO;
-import com.dy.minichat.entity.UndeliveredMessage;
 import com.dy.minichat.global.infra.kafka.payload.ChatMessagePayload;
 import com.dy.minichat.global.infra.grpc.client.MessageRelayClient;
 import com.dy.minichat.global.infra.kafka.producer.ChatMessageProducer;
 import com.dy.minichat.global.property.GrpcServerProperties;
-import com.dy.minichat.repository.UndeliveredMessageRepository;
 import com.dy.minichat.service.ChatService;
 import com.dy.minichat.service.FcmPushService;
 import com.dy.minichat.service.MessageService;
@@ -42,8 +39,6 @@ public class WebSocketHandler extends TextWebSocketHandler {
     private final ChatService chatService;
     private final MessageService messageService;
     private final FcmPushService fcmPushService;
-    private final UndeliveredMessageRepository undeliveredMessageRepository;
-    private final UndeliveredMessageIdGenerator undeliveredMessageIdGenerator;
 
     @Qualifier("redisTemplateForString")
     private final RedisTemplate<String, String> redisTemplateForString;
