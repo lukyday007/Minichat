@@ -16,14 +16,19 @@
 
 ## 📚 Tech Stack
 
-### Backend
+## 📚 Tech Stack
+
+### Backend & Database
 <img src="https://img.shields.io/badge/Java_17-007396?style=for-the-badge&logo=java&logoColor=white" /> <img src="https://img.shields.io/badge/Spring_Boot_3.x-6DB33F?style=for-the-badge&logo=springboot&logoColor=white" /> <img src="https://img.shields.io/badge/JPA-59666C?style=for-the-badge&logo=hibernate&logoColor=white" /> <img src="https://img.shields.io/badge/MySQL_8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white" />
 
-### Infrastructure & Messaging
-<img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white" /> <img src="https://img.shields.io/badge/Apache_Kafka-231F20?style=for-the-badge&logo=apachekafka&logoColor=white" /> <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" />
+### Messaging & Cache
+<img src="https://img.shields.io/badge/Apache_Kafka-231F20?style=for-the-badge&logo=apachekafka&logoColor=white" /> <img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white" />
 
 ### Protocol
 <img src="https://img.shields.io/badge/gRPC-244C5A?style=for-the-badge&logo=grpc&logoColor=white" /> <img src="https://img.shields.io/badge/WebSocket-010101?style=for-the-badge&logo=socket.io&logoColor=white" />
+
+### Infrastructure & Monitoring
+<img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" /> <img src="https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=prometheus&logoColor=white" /> <img src="https://img.shields.io/badge/Grafana-F46800?style=for-the-badge&logo=grafana&logoColor=white" />
 
 <br>
 
@@ -43,16 +48,6 @@
 
 ### 4. 비동기 이벤트 처리 (Event-Driven)
 * **Kafka 활용:** 채팅 전송과 채팅방 목록 업데이트 로직을 Kafka 이벤트로 분리하여 서비스 간 결합도를 낮추고(Decoupling), 시스템의 확장성을 확보했습니다.
-
-<br>
-
-## 🚧 Technical Challenge (해결 과제 및 추후 개선 방향)
-
-### **단일 레디스 서버의 제약**
-* **문제 상황:** 단일 Redis 서버 운영 중 트래픽 증가에 따른 확장성 제약 발생. 
-* **해결 방안:** Redis Cluster 도입을 통한 부하 분산 처리.
-* **직면 과제:** 클러스터 내 데이터 샤딩으로 인해 여러 노드에 걸쳐 있는 데이터에 대한 Lua Script 연산(Cross-slot error) 불가능.
-* **상세 해결:** **Redis Hashtag**(`{...}`)를 활용하여 특정 비즈니스 로직에 필요한 데이터들을 동일한 해시 슬롯 및 노드로 강제 배치하여 원자성 확보 
 
 <br>
 
@@ -91,16 +86,6 @@
 
 ### 4. Asynchronous Event Processing (Event-Driven)
 * **Kafka Integration:** Decoupled chat delivery and chat room update logic through Kafka-based event processing to improve scalability and reduce service coupling.
-
-<br>
-
-## 🚧 Technical Challenges & Improvements
-
-### **Limitations of a Single Redis Server**
-* **Problem:** Encountered scalability limitations as traffic increased while operating on a single Redis instance.
-* **Solution Approach:** Introduced Redis Cluster for distributed load handling.
-* **Challenge:** Lua Script operations across multiple nodes became impossible due to Redis Cluster sharding (`Cross-slot error`).
-* **Resolution:** Used **Redis Hashtag** (`{...}`) to force related business data into the same hash slot and node, ensuring atomic operations.
 
 <br>
 
