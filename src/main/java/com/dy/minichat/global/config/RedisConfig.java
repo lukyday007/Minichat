@@ -1,5 +1,7 @@
 package com.dy.minichat.global.config;
 
+import io.lettuce.core.ClientOptions;
+import io.lettuce.core.TimeoutOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,52 +19,57 @@ import java.time.Duration;
 
 @Configuration
 public class RedisConfig {
+
     @Value("${spring.data.redis.host}")
     private String host;
 
     @Value("${spring.data.redis.port}")
     private int port;
 
+
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
+        ClientOptions clientOptions = ClientOptions.builder()
+                .disconnectedBehavior(ClientOptions.DisconnectedBehavior.REJECT_COMMANDS)
+                .autoReconnect(true)
+                .timeoutOptions(TimeoutOptions.enabled(Duration.ofSeconds(2)))
+                .build();
+
         LettuceClientConfiguration cfg = LettuceClientConfiguration.builder()
+                .clientOptions(clientOptions)
                 .commandTimeout(Duration.ofSeconds(2))
                 .build();
+
         return new LettuceConnectionFactory(
                 new RedisStandaloneConfiguration(host, port), cfg);
     }
 
 
     @Bean
-    public RedisTemplate<String, Long> redisTemplateForLong () {
+    public RedisTemplate<String, Long> redisTemplateForLong (RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, Long> template = new RedisTemplate<>();
 
-        template.setConnectionFactory(redisConnectionFactory());
+        template.setConnectionFactory(connectionFactory);
         template.setKeySerializer(new StringRedisSerializer());
         template.setValueSerializer(new GenericToStringSerializer<>(Long.class));
         template.afterPropertiesSet();
         return template;
     }
 
+
     @Bean
-    public RedisTemplate<String, String> redisTemplateForString () {
+    public RedisTemplate<String, String> redisTemplateForString(RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, String> template = new RedisTemplate<>();
+        template.setConnectionFactory(connectionFactory);
 
-        template.setConnectionFactory(redisConnectionFactory());
-
-        // Key, Value 직렬화(Serialization) 방식을 String으로 설정
         template.setKeySerializer(new StringRedisSerializer());
         template.setValueSerializer(new StringRedisSerializer());
-
-        // Hash Key, Hash Value의 직렬화 방식도 String으로 설정
         template.setHashKeySerializer(new StringRedisSerializer());
         template.setHashValueSerializer(new StringRedisSerializer());
-
-        // 모든 설정이 완료되면 template을 초기화
         template.afterPropertiesSet();
-
         return template;
     }
+
 
     @Bean
     public RedisScript<Long> lastReadUpdateScript() {
@@ -84,7 +91,6 @@ public class RedisConfig {
         return redisScript;
     }
 
-    // RedisConfig.java 내부에 추가
 
     @Bean
     public RedisScript<Long> rateLimitScript() {
