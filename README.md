@@ -49,17 +49,20 @@
 
 <br>
 
-## 📈 Performance & Improvements (성능 개선 및 배운 점)
+### ⚙️ Problem Solving & Engineering Trade-offs
 
-| 이슈 및 목표 | 해결 과정 및 결과 |
-| :--- | :--- |
-| **알고리즘 최적화** | 기존 연산 로직을 **누적 합계 알고리즘**으로 개선하여 연산 효율 극대화 |
-| **쿼리 튜닝** | 조회 쿼리에 **복합 인덱스** 적용 및 페이징 처리를 통해 쿼리 실행 계획 최적화 |
-| **캐싱 전략 고도화** | 빈번한 쓰기 작업에 대해 **Redis Write-Back** 전략을 도입, DB 부하 감소 및 응답 속도 개선 |
-| **네트워크 비용** | JSON 기반 통신 대비 **gRPC** 도입으로 데이터 직렬화 크기를 줄여 릴레이 성능 최적화 |
+프로젝트를 진행하며 직면한 구조적 문제와 이를 해결하기 위한 기술적 의사결정 기록입니다.
 
+- [분산 락 대신 Lua Script를 선택한 이유](https://lukyday-blog.vercel.app/problem-solving/minichat/01-distributed-lock-vs-lua-script/)
+- [Kafka 순서를 보장할 때와 포기할 때](https://lukyday-blog.vercel.app/problem-solving/minichat/02-kafka-message-ordering/)
+- [복제 지연 상황에서 읽기 전략을 선택하는 기준](https://lukyday-blog.vercel.app/problem-solving/minichat/03-read-write-replication-lag/)
+- [같은 Redis 장애에 다른 대응을 선택한 이유](https://lukyday-blog.vercel.app/problem-solving/minichat/04-redis-rate-limiter/)
+- [분산 환경에서 ID 전략](https://lukyday-blog.vercel.app/problem-solving/minichat/05-id-strategy-in-distributed-system/)
+- [WebSocket에서 브로드캐스트를 포기한 이유](https://lukyday-blog.vercel.app/problem-solving/minichat/06-websocket-scale-out-grpc/)
+- [유저 단위보다 서버 단위를 선택한 이유](https://lukyday-blog.vercel.app/problem-solving/minichat/07-parallel-wasnt-enough/)
 
 --- 
+
 # 🚀 MiniChat - Real-Time Chat Server for Large-Scale Traffic
 
 > **A backend server designed for large-scale concurrent environments with a strong focus on data consistency and system stability**
@@ -87,11 +90,14 @@
 
 <br>
 
-## 📈 Performance Optimizations & Lessons Learned
+### ⚙️ Problem Solving & Engineering Trade-offs
 
-| Issue / Goal | Optimization & Result |
-| :--- | :--- |
-| **Algorithm Optimization** | Improved computational efficiency by redesigning logic with a **prefix sum algorithm** |
-| **Query Tuning** | Optimized query execution plans using **composite indexes** and pagination |
-| **Caching Strategy** | Applied a **Redis Write-Back** strategy for write-heavy workloads to reduce DB load and improve response speed |
-| **Network Overhead** | Reduced serialization payload size and improved relay performance by replacing JSON-based communication with **gRPC** |
+A record of the structural challenges encountered during the project and the technical decisions made to resolve them.
+
+- [Choosing Lua Script Over Distributed Lock](https://lukyday-blog.vercel.app/en/problem-solving/minichat/01-distributed-lock-vs-lua-script/)
+- [When Kafka Ordering Matters and When It Doesn't](https://lukyday-blog.vercel.app/en/problem-solving/minichat/02-kafka-message-ordering/)
+- [Choosing a Read Strategy Under Replication Lag](https://lukyday-blog.vercel.app/en/problem-solving/minichat/03-read-write-replication-lag/)
+- [Why the Same Redis Failure Needs Different Responses](https://lukyday-blog.vercel.app/en/problem-solving/minichat/04-redis-rate-limiter/)
+- [Choosing an ID Strategy for Distributed Systems](https://lukyday-blog.vercel.app/en/problem-solving/minichat/05-id-strategy-in-distributed-system/)
+- [Choosing Target Routing Over Broadcast](https://lukyday-blog.vercel.app/en/problem-solving/minichat/06-websocket-scale-out-grpc/)
+- [Choosing Server-Level Bulk Relay Over Per-User Processing](https://lukyday-blog.vercel.app/en/problem-solving/minichat/07-parallel-wasnt-enough/)
