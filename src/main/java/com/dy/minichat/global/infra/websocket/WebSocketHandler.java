@@ -22,12 +22,13 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
-import java.time.Duration;
-import java.util.concurrent.Executor;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
 @Component
@@ -62,44 +63,46 @@ public class WebSocketHandler extends TextWebSocketHandler {
     @Value("${relay.mode:bulk}")
     private String relayMode;
 
+    private final AtomicLong mgetCircuitOpenUntil = new AtomicLong(0);
+    private final AtomicLong chatIdCircuitOpenUntil = new AtomicLong(0);
+    private static final long CIRCUIT_OPEN_MS = 5000;
+
+
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        /*
-            write lock
-            userIdSessionMap.put(10L, session);
-            redis.set(10, localHostIp());
-        */
-        // Handshake 인터셉터에서 userId를 넣어주기
 
         Optional<Long> userIdOptional = getUserIdFromSession(session);
 
-        // userId가 존재할 경우에만 연결 수립 로직 진행
         if (userIdOptional.isPresent()) {
             Long userId = userIdOptional.get();
-            String userKey = "userId:" + userId + ":state";
 
-            // redis 에서 chatId 조회
-            String chatIdStr = (String) redisTemplateForString.opsForHash().get(userKey, "chatId");
+            // Redis 성공 여부와 무관하게 로컬 세션은 반드시 등록
+            sessionManager.addSession(userId, session);
 
-            if (chatIdStr != null) {
-                // 로컬 메모리에 세션 저장
-                sessionManager.addSession(userId, session);
+            try {
+                String userKey = "userId:" + userId + ":state";
+                String chatIdStr = (String) redisTemplateForString.opsForHash().get(userKey, "chatId");
 
-                // redis - user : chat
-                redisTemplateForString.opsForHash().put(userKey, "serverId", serverIdentifier);
-                redisTemplateForString.opsForHash().put(userKey, "lastActive", LocalDateTime.now().toString());
+                if (chatIdStr != null) {
+                    // 세션 캐시에 chatId 적재 → resolveChatId 폴백용
+                    session.getAttributes().put("chatId", Long.parseLong(chatIdStr));
 
-                // redis - user : server
-                String redisKey = USER_SERVER_KEY_PREFIX + userId;
-                redisTemplateForString.opsForValue().set(redisKey, serverIdentifier);
+                    // redis - user : chat
+                    redisTemplateForString.opsForHash().put(userKey, "serverId", serverIdentifier);
+                    redisTemplateForString.opsForHash().put(userKey, "lastActive", LocalDateTime.now().toString());
 
-                // 재연결 시 상태 키 TTL 갱신
-                redisTemplateForString.expire(userKey, USER_STATE_TTL);
+                    // redis - user : server
+                    String redisKey = USER_SERVER_KEY_PREFIX + userId;
+                    redisTemplateForString.opsForValue().set(redisKey, serverIdentifier);
 
-                // log.info("유저 {} → 서버 [{}] 등록 완료", userId, serverIdentifier);
-                // log.info("유저 {}가 채팅방 {}에 연결됨, server log = {}", userId, chatIdStr, serverIdentifier);
-            } else {
-                log.warn("유저 {}의 chatId 정보가 없음 — API 미호출 가능성 있음", userId);
+                    // 재연결 시 상태 키 TTL 갱신
+                    redisTemplateForString.expire(userKey, USER_STATE_TTL);
+                } else {
+                    log.warn("유저 {}의 chatId 정보가 없음 — API 미호출 가능성 있음", userId);
+                }
+
+            } catch (Exception e) {
+                log.error("[Fail-Open] 연결 수립 중 Redis 실패 — 로컬 세션만 유지. user: {}", userId, e);
             }
 
         } else {
@@ -127,17 +130,8 @@ public class WebSocketHandler extends TextWebSocketHandler {
         String payload = message.getPayload();
         TalkMessageDTO talkMessageDTO = objectMapper.readValue(payload, TalkMessageDTO.class);
 
-        Optional<Long> chatIdOpt = getCurrentChatIdForUser(senderId);
-        if (chatIdOpt.isEmpty()) {
-            log.warn("[메시지 무시] user:{} 의 Redis상 chatId 정보가 없음 (채팅방 미입장 상태)", senderId);
-            return;
-        }
-        if (!chatIdOpt.get().equals(talkMessageDTO.getChatId())) {
-            log.warn("[메시지 무시] user:{} 의 Redis상 chatId({})가 수신 메시지의 chatId({})와 다름",
-                    senderId, chatIdOpt.get(), talkMessageDTO.getChatId());
-            return;
-        }
-        Long chatId = chatIdOpt.get();
+        Long chatId = resolveChatId(session, senderId, talkMessageDTO.getChatId());
+        if (chatId == null) return;
 
         talkMessageDTO.setSenderId(senderId);
         talkMessageDTO.setTimestamp(Instant.now());
@@ -150,7 +144,9 @@ public class WebSocketHandler extends TextWebSocketHandler {
                         new MessageRequestDTO(talkMessageDTO.getContent()), senderId, chatId
                 );
 
-                // 카프카 패이로드 조립 후 프로듀서에게 위임 -> 컨슈머가 받아서 안정적 처리 => 만약 안되면? (그래서 먼저 디비에 저장)
+                // 카프카 패이로드 조립 후 프로듀서에게 위임
+                // -> 컨슈머가 받아서 안정적 처리
+                // => 만약 안되면? (그래서 먼저 디비에 저장)
                 ChatMessagePayload event = ChatMessagePayload.builder()
                         .talkMessage(talkMessageDTO)
                         .build();
@@ -167,11 +163,58 @@ public class WebSocketHandler extends TextWebSocketHandler {
     }
 
 
+    /**
+     * 발신자의 현재 chatId를 확정한다.
+     * Redis(우선) → 세션 캐시(장애 시 폴백) 순으로 조회, 메시지의 chatId와 일치하는지 검증
+     * @return 검증된 chatId. 확정 불가하거나 불일치하면 null (메시지 폐기)
+     */
+    private Long resolveChatId(WebSocketSession session, Long senderId, Long claimedChatId) {
+        Long chatId = null;
+
+        // 1) Redis 조회 (서킷이 닫혀 있을 때만) - write through
+        long now = System.currentTimeMillis();
+        if (now >= chatIdCircuitOpenUntil.get()) {
+            try {
+                Object v = redisTemplateForString.opsForHash()
+                        .get("userId:" + senderId + ":state", "chatId");
+
+                // 직전까지 정상 대화하던 유저는 장애 중에도 계속 전송 가능, 장애 중 방을 옮긴 유저만 차단
+                if (v != null) {
+                    chatId = Long.parseLong(v.toString());
+                    session.getAttributes().put("chatId", chatId);
+                }
+            } catch (Exception e) {
+                chatIdCircuitOpenUntil.set(now + CIRCUIT_OPEN_MS);
+                log.error("[서킷 오픈] Redis chatId 조회 실패 → {}ms간 세션 캐시 사용. user:{}",
+                        CIRCUIT_OPEN_MS, senderId, e);
+            }
+        }
+
+        // 2) Redis 실패/서킷 오픈 → 세션 캐시 폴백
+        if (chatId == null && session.getAttributes().get("chatId") instanceof Long cached) {
+            chatId = cached;
+        }
+
+        // 3) 검증
+        if (chatId == null) {
+            log.warn("[메시지 무시] user:{} chatId 확정 실패 (Redis·세션 캐시 모두 없음)", senderId);
+            return null;
+        }
+        if (!chatId.equals(claimedChatId)) {
+            log.warn("[메시지 무시] user:{} 실제 chatId({}) ≠ 메시지 chatId({})",
+                    senderId, chatId, claimedChatId);
+            return null;
+        }
+        return chatId;
+    }
+
+
     // [신규 추가] Kafka Consumer가 호출할 public 메서드 -> private sendMessageToChatRoom
     public void broadcastMessage(TalkMessageDTO message) {
         // log.info("[Kafka Consume] Broadcast 시작. ChatId: {}, Sender: {}", message.getChatId(), message.getSenderId());
         sendMessageToChatRoom(message);
     }
+
 
     @Qualifier("customThreadPool")
     private final Executor executor;
@@ -256,12 +299,20 @@ public class WebSocketHandler extends TextWebSocketHandler {
                 .toList();
 
         List<String> serverIds;
-        try {
-            serverIds = redisTemplateForString.opsForValue().multiGet(redisKeys);
-        } catch (Exception e) {
-            log.error("[원격 전파 실패] Redis MGET 중 인프라 에러. 원격/오프라인 유저 전파를 건너뜁니다. chatId: {}", chatId, e);
-            return;
+        long now = System.currentTimeMillis();
+
+        if (now < mgetCircuitOpenUntil.get()) {
+            serverIds = null;   // 서킷 열림 → 전원 오프라인 처리
+        } else {
+            try {
+                serverIds = redisTemplateForString.opsForValue().multiGet(redisKeys);
+            } catch (Exception e) {
+                mgetCircuitOpenUntil.set(System.currentTimeMillis() + CIRCUIT_OPEN_MS);
+                log.error("[서킷 오픈] Redis 세션 위치 조회 실패 → 5초간 전원 오프라인 처리", e);
+                serverIds = null;
+            }
         }
+
 
         // Phase 4: 서버별 그룹핑
         Map<String, List<Long>> serverToRecipients = new HashMap<>();
@@ -307,6 +358,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
 
     // Phase 6 세부: 오프라인 유저 미전달 시 FCM 발송
     private void saveOfflineMessages(List<Long> offlineUserIds, TalkMessageDTO message) {
+        // 운영 시 개선 후보 : executor.execute()로 던지거나, FCM 배치 API(멀티캐스트) 적용
         offlineUserIds.forEach(userId ->
                 fcmPushService.sendPushNotification(userId, message));
     }
@@ -372,25 +424,17 @@ public class WebSocketHandler extends TextWebSocketHandler {
         Long userId = userIdOptional.get();
         sessionManager.removeSession(userId);
 
-        // (선택) chatService에 비정상 종료를 알려 상태를 정리하도록 할 수 있습니다.
-        // chatService.handleDisconnect(userId);
-
-        // [추가] Redis에 저장된 사용자 위치 정보 삭제
-        String userKey = "userId:" + userId + ":state";
-        String chatIdStr = (String) redisTemplateForString.opsForHash().get(userKey, "chatId");
-        if (chatIdStr != null) {
-            redisTemplateForString.opsForSet().remove("chatId:" + chatIdStr + ":userId", String.valueOf(userId));
+        try {
+            String userKey = "userId:" + userId + ":state";
+            String chatIdStr = (String) redisTemplateForString.opsForHash().get(userKey, "chatId");
+            if (chatIdStr != null) {
+                redisTemplateForString.opsForSet().remove("chatId:" + chatIdStr + ":userId", String.valueOf(userId));
+            }
+            redisTemplateForString.delete(USER_SERVER_KEY_PREFIX + userId);
+            redisTemplateForString.opsForHash().delete(userKey, "serverId", "lastActive");
+        } catch (Exception e) {
+            log.error("[연결 종료] Redis 정리 실패 — TTL(24h) 만료에 위임. user: {}", userId, e);
         }
-
-        // 메모리/Redis 정리
-        sessionManager.removeSession(userId);
-        redisTemplateForString.delete(USER_SERVER_KEY_PREFIX + userId);
-        // log.info("유저 {}의 연결 종료, 서버 [{}]에서 정리 완료", userId, serverIdentifier);
-
-        // redisTemplate.delete(userKey);
-        redisTemplateForString.opsForHash().delete(userKey, "serverId", "lastActive");
-        // log.info("[연결 종료] Redis 사용자 접속 상태(서버)만 삭제. Key: {}", userKey);
-        // log.info("[연결 종료] Redis 사용자 위치 정보 삭제. Key: {}", userKey);
     }
 
 

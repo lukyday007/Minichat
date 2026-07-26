@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
 @Aspect
@@ -35,11 +36,15 @@ public class RateLimitAspect {
     private static final long WINDOW_SIZE_MS = 60000; // 1분 (60,000 ms)
     private static final long MESSAGE_LIMIT = 100;    // 분당 100회
 
+    private final AtomicLong redisCircuitOpenUntil = new AtomicLong(0);
+    private static final long CIRCUIT_OPEN_MS = 5000;
+
     /*
      * Pointcut: WebSocketHandler의 handleTextMessage 메서드를 대상
      */
     @Pointcut("execution(* com.dy.minichat.global.infra.websocket.WebSocketHandler.handleTextMessage(..))")
     public void webSocketMessageHandling() {}
+
 
     @Around("webSocketMessageHandling()")
     public Object checkRateLimit(ProceedingJoinPoint joinPoint) throws Throwable {
@@ -47,32 +52,33 @@ public class RateLimitAspect {
         Object[] args = joinPoint.getArgs();
         WebSocketSession session = (WebSocketSession) args[0];
 
-        // 1. 세션에서 userId 추출 (원본 핸들러의 private 메서드 대신 속성 직접 접근)
         Optional<Long> userIdOpt = getUserIdFromSessionAttributes(session);
 
         if (userIdOpt.isEmpty()) {
-            // userId가 없는 비정상 세션은 원본 메서드가 처리하도록 그대로 진행
             return joinPoint.proceed();
         }
 
         Long userId = userIdOpt.get();
 
-        // [신규 로직] 속도 제한(Lua) 검사 *전*에 밴 상태부터 확인
-        if (userBanService.isUserBanned(userId)) {
-            log.warn("[AOP 차단] 이미 밴 상태(임시 또는 영구)인 사용자 {}의 메시지 전송 시도", userId);
-            // 밴 상태 유저의 연결은 즉시 종료
-            session.close(CloseStatus.POLICY_VIOLATION.withReason("Banned User"));
-            // 원본 메서드 실행 중단
-            return null;
+        // 서킷 열림 → Redis 기반 검사 전체를 건너뛰고 통과 (Fail-Open)
+        long now = System.currentTimeMillis();
+        if (now < redisCircuitOpenUntil.get()) {
+            return joinPoint.proceed();
         }
 
         String redisKey = RATE_LIMIT_KEY_PREFIX + userId;
         long currentTime = Instant.now().toEpochMilli();
-        // ZADD의 member는 고유해야 함 (동일 timestamp 동시 요청 구분)
         String uniqueMember = currentTime + ":" + UUID.randomUUID().toString();
 
         try {
-            // 2. Lua 스크립트 실행
+            // 밴 상태 확인 (Redis 기반이므로 try 안에서 처리)
+            if (userBanService.isUserBanned(userId)) {
+                log.warn("[AOP 차단] 이미 밴 상태(임시 또는 영구)인 사용자 {}의 메시지 전송 시도", userId);
+                session.close(CloseStatus.POLICY_VIOLATION.withReason("Banned User"));
+                return null;
+            }
+
+            // Lua 스크립트 실행
             Long result = redisTemplateForString.execute(
                     rateLimitScript,
                     Collections.singletonList(redisKey),
@@ -82,30 +88,27 @@ public class RateLimitAspect {
                     uniqueMember
             );
 
-            // 3. 결과 확인 (1: 한도 초과, 0: 한도 이내)
+            // 결과 확인 (1: 한도 초과, 0: 한도 이내)
             if (result != null && result == 1) {
-                // 한도 초과!
-                log.warn("[RateLimit] 사용자 {} 밴 처리 ({}ms 동안 {}회 초과)",
-                        userId, WINDOW_SIZE_MS, MESSAGE_LIMIT);
-
-                // 4. 사용자 밴 처리
+                log.warn("[RateLimit] 사용자 {} 밴 처리 ({}ms 동안 {}회 초과)", userId, WINDOW_SIZE_MS, MESSAGE_LIMIT);
                 userBanService.applyStrike(userId);
-
-                // 5. 웹소켓 연결 강제 종료
                 session.close(CloseStatus.POLICY_VIOLATION.withReason("Message rate limit exceeded."));
-
-                // 6. 원본 handleTextMessage 메서드 실행 중단 (null 반환)
                 return null;
             }
 
         } catch (Exception e) {
-            // Redis 장애 시 요청을 막기보다 일단 통과시키는 것이 나을 수 있음 (Fail-Open)
-            log.error("[RateLimit] Redis 스크립트 실행 오류. user: {}", userId, e);
+            // Redis 장애 → 서킷 오픈 (5초간 Redis 호출 자체를 건너뜀)
+            redisCircuitOpenUntil.set(System.currentTimeMillis() + CIRCUIT_OPEN_MS);
+            log.error("[서킷 오픈] RateLimit Redis 실패 → {}ms간 Fail-Open. user: {}", CIRCUIT_OPEN_MS, userId, e);
+
+            // 3회 밴을 제외한 다른 밴일 유저인 경우
+            //      degradation : 장애 5초 창 동안 밴/속도제한 미적용
         }
 
-        // 7. 한도 이내: 원본 메서드(handleTextMessage) 실행
+        // 한도 이내 또는 서킷 오픈: 원본 메서드(handleTextMessage) 실행
         return joinPoint.proceed();
     }
+
 
     /**
      * AOP Aspect에서 세션 속성에 직접 접근하여 userId를 가져옵니다.

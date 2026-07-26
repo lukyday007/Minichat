@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -51,6 +52,10 @@ public class ChatService {
 
     private static final Duration USER_STATE_TTL = Duration.ofHours(24);
     private static final Duration CHAT_MEMBERS_TTL = Duration.ofHours(24);
+
+    private final AtomicLong redisCircuitOpenUntil = new AtomicLong(0);
+    private static final long CIRCUIT_OPEN_MS = 5000;
+
 
     /*
         // K: userId, V: 현재 입장해 있는 roomId
@@ -325,31 +330,27 @@ public class ChatService {
 
 
     public Set<Long> getUsersInChat(Long chatId) {
-        // 필수 파라미터 null 검증 (Fail-Fast)
-        if (chatId == null) {
-            log.error("[유저 목록 조회 실패] 채팅방 ID가 null입니다.");
-            throw new IllegalArgumentException("채팅방 ID는 필수값입니다.");
+        long now = System.currentTimeMillis();
+
+        // 서킷 열림 → Redis 건너뛰고 DB 직행
+        if (now < redisCircuitOpenUntil.get()) {
+            return userChatRepository.findUserIdsByChatIdWithSet(chatId);
         }
 
-        Set<String> userIdsStr = redisTemplateForString.opsForSet().members("chatId:" + chatId + ":userId");
-
-        if (userIdsStr == null || userIdsStr.isEmpty()) {
-            return Collections.emptySet();
+        try {
+            Set<String> ids = redisTemplateForString.opsForSet()
+                    .members("chatId:" + chatId + ":userId");
+            if (ids != null && !ids.isEmpty()) {
+                return ids.stream().map(Long::valueOf).collect(Collectors.toSet());
+            }
+        } catch (Exception e) {
+            redisCircuitOpenUntil.set(System.currentTimeMillis() + CIRCUIT_OPEN_MS);
+            log.error("[서킷 오픈] Redis 방 멤버 조회 실패 → {}ms간 DB 직행. chatId={}",
+                    CIRCUIT_OPEN_MS, chatId, e);
         }
 
-        return userIdsStr.stream()
-                .filter(idStr -> {
-                    // Redis 세션 오염 방어 (숫자가 아닌 비정상 데이터 유입 시 NumberFormatException 원천 차단)
-                    if (idStr == null || !idStr.matches("^\\d+$")) {
-                        log.error("[Redis 무결성 위반 데이터 감지] 숫자가 아닌 유저 ID 포맷이 발견되었습니다. 무시합니다. 값: {}, chatId: {}", idStr, chatId);
-                        return false;
-                    }
-                    return true;
-                })
-                .map(Long::valueOf)
-                .collect(Collectors.toSet());
+        return userChatRepository.findUserIdsByChatIdWithSet(chatId);
     }
-
 
     // ========
 
