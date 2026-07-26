@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public interface UserChatRepository extends JpaRepository<UserChat, Long> {
@@ -48,6 +49,9 @@ public interface UserChatRepository extends JpaRepository<UserChat, Long> {
     // 특정 채팅방에 속한 모든 사용자의 ID 목록만 조회 쿼리
     @Query("SELECT uc.user.id FROM UserChat uc WHERE uc.chat.id = :chatId AND uc.isDeleted = false")
     List<Long> findUserIdsByChatId(@Param("chatId") Long chatId);
+
+    @Query("SELECT uc.user.id FROM UserChat uc WHERE uc.chat.id = :chatId AND uc.isDeleted = false")
+    Set<Long> findUserIdsByChatIdWithSet(@Param("chatId") Long chatId);
 
     @Query("SELECT uc.id FROM UserChat uc WHERE uc.chat.id = :chatId AND uc.isDeleted = false")
     List<Long> findIdsByChatId(@Param("chatId") Long chatId);
